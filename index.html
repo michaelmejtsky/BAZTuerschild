@@ -3,26 +3,31 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>BAZTuerschild</title>
+  <title>BAZ Türschild</title>
   <style>
     html, body {
       margin: 0;
-      padding: 0;
       width: 100%;
       height: 100%;
-      background: #000;
+      background: black;
       overflow: hidden;
     }
 
-    iframe {
-      width: 100%;
-      height: 100%;
-      border: none;
+    body {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    img {
+      max-width: 100vw;
+      max-height: 100vh;
+      object-fit: contain;
       display: block;
     }
   </style>
 </head>
 <body>
-  <iframe src="https://res.cloudinary.com/dkyx7nz70/image/upload/tuerschild/dienst"></iframe>
+  <img id="schild" src="https://res.cloudinary.com/dkyx7nz70/image/upload/tuerschild/dienst.png" alt="Türschild">
 </body>
 </html>
