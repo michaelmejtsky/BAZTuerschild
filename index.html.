@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Infoscreen</title>
+  <title>BAZTuerschild</title>
   <style>
     html, body {
       margin: 0;
@@ -23,6 +23,6 @@
   </style>
 </head>
 <body>
-  <iframe src="https://script.google.com/macros/s/AKfycbzXEPgwDEjn6iX5Vf73-kyX3g7D0pQtiygkP4xT6wQ7FZb0kplB_6JnCWO0a68zmAkL/exec"></iframe>
+  <iframe src="https://res.cloudinary.com/dkyx7nz70/image/upload/tuerschild/dienst"></iframe>
 </body>
 </html>
