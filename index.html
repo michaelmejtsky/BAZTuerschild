@@ -9,21 +9,23 @@
     html, body {
       margin: 0;
       padding: 0;
-      width: 100%;
-      height: 100%;
+      width: 100vw;
+      height: 100vh;
       background: #000;
       overflow: hidden;
     }
 
     #schild {
       position: fixed;
-      inset: -2px; /* 🔥 verhindert schwarzen Rand */
-      min-width: 100%;
-      min-height: 100%;
-      width: auto;
-      height: auto;
+      top: 50%;
+      left: 50%;
+      width: 100vw;
+      height: 100vh;
       object-fit: cover;
+      transform: translate(-50%, -50%) scale(1.04);
+      transform-origin: center center;
       display: none;
+      border: 0;
     }
 
     #fallback {
@@ -53,8 +55,8 @@
 
     const urls = [
       "https://lh3.googleusercontent.com/d/" + fileId,
-      "https://drive.google.com/uc?export=view&id=" + fileId,
-      "https://drive.google.com/thumbnail?id=" + fileId + "&sz=w3000"
+      "https://drive.google.com/thumbnail?id=" + fileId + "&sz=w3000",
+      "https://drive.google.com/uc?export=view&id=" + fileId
     ];
 
     let urlIndex = 0;
@@ -86,10 +88,7 @@
       }
     };
 
-    // Initial laden
     loadImage();
-
-    // 🔄 alle 10 Sekunden neu laden
     setInterval(loadImage, 10000);
   </script>
 </body>
