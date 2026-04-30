@@ -6,50 +6,55 @@
   <title>BAZ Türschild</title>
 
   <style>
-    html, body {
-      margin: 0;
-      padding: 0;
-      width: 100vw;
-      height: 100vh;
-      background: #000;
-      overflow: hidden;
+    * {
+      box-sizing: border-box;
     }
 
-    #screen {
+    html, body {
+      margin: 0 !important;
+      padding: 0 !important;
+      width: 100vw !important;
+      height: 100vh !important;
+      overflow: hidden !important;
+      background: black;
+    }
+
+    #schild {
       position: fixed;
       top: 0;
       left: 0;
-      width: 100vw;
-      height: 100vh;
-      background-color: #000;
-      background-position: center center;
-      background-repeat: no-repeat;
-      background-size: cover;
+      width: 100vw !important;
+      height: 100vh !important;
+      object-fit: fill !important; /* 🔥 füllt exakt den Bildschirm */
+      display: none;
+      border: none;
+      margin: 0;
+      padding: 0;
     }
 
     #fallback {
       position: fixed;
       inset: 0;
+      background: black;
       color: white;
       font-family: Arial, sans-serif;
       font-size: 3vw;
-      display: none;
+      display: flex;
       align-items: center;
       justify-content: center;
       text-align: center;
-      background: #000;
     }
   </style>
 </head>
 
 <body>
-  <div id="screen"></div>
-  <div id="fallback">Kein Türschild verfügbar<br><br>Drive prüfen</div>
+  <img id="schild" alt="Türschild">
+  <div id="fallback">Türschild wird geladen...</div>
 
   <script>
     const fileId = "1DEVPnBgUSTi3_LvctYcAG-PRyywNvAcQ";
 
-    const screen = document.getElementById("screen");
+    const img = document.getElementById("schild");
     const fallback = document.getElementById("fallback");
 
     const urls = [
@@ -58,36 +63,34 @@
       "https://drive.google.com/uc?export=view&id=" + fileId
     ];
 
-    let currentUrlIndex = 0;
+    let index = 0;
 
     function loadImage() {
-      currentUrlIndex = 0;
+      index = 0;
       tryLoad();
     }
 
     function tryLoad() {
-      const testImg = new Image();
-      const baseUrl = urls[currentUrlIndex];
-      const url = baseUrl + (baseUrl.includes("?") ? "&" : "?") + "t=" + Date.now();
+      const base = urls[index];
+      const url = base + (base.includes("?") ? "&" : "?") + "t=" + Date.now();
 
-      testImg.onload = function() {
-        screen.style.backgroundImage = 'url("' + url + '")';
-        screen.style.display = "block";
+      img.onload = function () {
+        img.style.display = "block";
         fallback.style.display = "none";
       };
 
-      testImg.onerror = function() {
-        currentUrlIndex++;
-
-        if (currentUrlIndex < urls.length) {
+      img.onerror = function () {
+        index++;
+        if (index < urls.length) {
           tryLoad();
         } else {
-          screen.style.display = "none";
+          img.style.display = "none";
           fallback.style.display = "flex";
+          fallback.innerHTML = "Kein Türschild verfügbar<br><br>Drive prüfen";
         }
       };
 
-      testImg.src = url;
+      img.src = url;
     }
 
     loadImage();
