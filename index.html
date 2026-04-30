@@ -7,29 +7,33 @@
 
   <style>
     * {
+      margin: 0;
+      padding: 0;
       box-sizing: border-box;
     }
 
     html, body {
-      margin: 0 !important;
-      padding: 0 !important;
-      width: 100vw !important;
-      height: 100vh !important;
-      overflow: hidden !important;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
       background: black;
     }
 
-    #schild {
+    /* 🔥 EXTRA FIX gegen PlaySignage Balken */
+    #wrapper {
       position: fixed;
-      top: 0;
-      left: 0;
-      width: 100vw !important;
-      height: 100vh !important;
-      object-fit: fill !important; /* 🔥 füllt exakt den Bildschirm */
+      top: -5px;
+      left: -5px;
+      width: calc(100vw + 10px);
+      height: calc(100vh + 10px);
+      overflow: hidden;
+    }
+
+    #schild {
+      width: 100%;
+      height: 100%;
+      object-fit: fill; /* 👉 füllt ALLES */
       display: none;
-      border: none;
-      margin: 0;
-      padding: 0;
     }
 
     #fallback {
@@ -48,7 +52,11 @@
 </head>
 
 <body>
-  <img id="schild" alt="Türschild">
+
+  <div id="wrapper">
+    <img id="schild" alt="Türschild">
+  </div>
+
   <div id="fallback">Türschild wird geladen...</div>
 
   <script>
@@ -94,7 +102,10 @@
     }
 
     loadImage();
+
+    // 🔄 alle 10 Sekunden neu laden
     setInterval(loadImage, 10000);
   </script>
+
 </body>
 </html>
