@@ -20,22 +20,21 @@
       inset: 0;
       width: 100vw;
       height: 100vh;
-      object-fit: cover;
+      object-fit: cover; /* 👉 füllt ganzen Bildschirm */
       display: block;
-      border: 0;
     }
 
     #fallback {
-      color: white;
-      font-family: Arial, sans-serif;
-      font-size: 3vw;
-      text-align: center;
       display: none;
       position: fixed;
       inset: 0;
+      background: #000;
+      color: white;
+      font-family: Arial, sans-serif;
+      font-size: 3vw;
+      display: flex;
       align-items: center;
       justify-content: center;
-      background: #000;
     }
   </style>
 </head>
@@ -48,24 +47,27 @@
     const img = document.getElementById('schild');
     const fallback = document.getElementById('fallback');
 
-    // Drive Direktlink
-    const baseUrl = "https://drive.google.com/uc?export=view&id=1DEVPnBgUSTi3_LvctYcAG-PRyywNvAcQ";
+    // 👉 DEIN Drive Bild (funktionierend als Bild)
+    const baseUrl = "https://drive.google.com/thumbnail?id=1DEVPnBgUSTi3_LvctYcAG-PRyywNvAcQ&sz=w2000";
 
     function loadImage() {
-      img.src = baseUrl + "&t=" + Date.now();
+      img.src = baseUrl + "&cache=" + Date.now(); // Cache umgehen
     }
-
-    img.onerror = function () {
-      img.style.display = "none";
-      fallback.style.display = "flex";
-    };
 
     img.onload = function () {
       img.style.display = "block";
       fallback.style.display = "none";
     };
 
+    img.onerror = function () {
+      img.style.display = "none";
+      fallback.style.display = "flex";
+    };
+
+    // Initial laden
     loadImage();
+
+    // 🔄 alle 10 Sekunden aktualisieren
     setInterval(loadImage, 10000);
   </script>
 </body>
