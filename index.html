@@ -9,8 +9,8 @@
     html, body {
       margin: 0;
       padding: 0;
-      width: 100vw;
-      height: 100vh;
+      width: 100%;
+      height: 100%;
       background: #000;
       overflow: hidden;
     }
@@ -19,13 +19,8 @@
       position: fixed;
       top: 50%;
       left: 50%;
-      width: 100vw;
-      height: 100vh;
-      object-fit: cover;
-      transform: translate(-50%, -50%) scale(1.04);
-      transform-origin: center center;
+      transform: translate(-50%, -50%);
       display: none;
-      border: 0;
     }
 
     #fallback {
@@ -72,21 +67,38 @@
     }
 
     img.onload = function () {
+      adjustImage();
       img.style.display = "block";
       fallback.style.display = "none";
     };
 
     img.onerror = function () {
       urlIndex++;
-
       if (urlIndex < urls.length) {
         tryUrl();
       } else {
         img.style.display = "none";
         fallback.style.display = "flex";
-        fallback.innerHTML = "Kein Türschild verfügbar<br><br>Drive-Freigabe prüfen";
+        fallback.innerHTML = "Kein Türschild verfügbar<br><br>Drive prüfen";
       }
     };
+
+    function adjustImage() {
+      const screenRatio = window.innerWidth / window.innerHeight;
+      const imageRatio = img.naturalWidth / img.naturalHeight;
+
+      if (imageRatio > screenRatio) {
+        // Bild ist breiter → Höhe anpassen
+        img.style.height = "100vh";
+        img.style.width = "auto";
+      } else {
+        // Bild ist höher → Breite anpassen
+        img.style.width = "100vw";
+        img.style.height = "auto";
+      }
+    }
+
+    window.onresize = adjustImage;
 
     loadImage();
     setInterval(loadImage, 10000);
