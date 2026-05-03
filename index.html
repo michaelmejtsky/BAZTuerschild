@@ -24,7 +24,6 @@
       inset: 0;
       width: 100vw;
       height: 100vh;
-      overflow: hidden;
       background: black;
     }
 
@@ -33,7 +32,6 @@
       height: 100%;
       object-fit: fill;
       display: none;
-      border: 0;
     }
 
     #fallback {
@@ -47,88 +45,82 @@
       align-items: center;
       justify-content: center;
       text-align: center;
-      padding: 30px;
     }
   </style>
 </head>
 
 <body>
-  <div id="wrapper">
-    <img id="schild" alt="Türschild">
-  </div>
 
-  <div id="fallback">Türschild wird geladen...</div>
+<div id="wrapper">
+  <img id="schild" alt="Türschild">
+</div>
 
-  <script>
-    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbx7iycjDS2MtYA1sTFPiqHs2XV3G0JBlKUxfysi2UBZoVaKuNJGMM7gOAnFexj7Bssq/exec";
+<div id="fallback">Türschild wird geladen...</div>
 
-    const img = document.getElementById("schild");
-    const fallback = document.getElementById("fallback");
+<script>
+  const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbx7iycjDS2MtYA1sTFPiqHs2XV3G0JBlKUxfysi2UBZoVaKuNJGMM7gOAnFexj7Bssq/exec";
 
-    let lastUpdatedTs = 0;
+  const img = document.getElementById("schild");
+  const fallback = document.getElementById("fallback");
 
-    function loadMetaJsonp() {
-      const callbackName = "tuerschildCallback_" + Date.now();
+  let lastUpdated = 0;
 
-      window[callbackName] = function(data) {
-        try {
-          delete window[callbackName];
+  function loadData() {
+    const callbackName = "cb_" + Date.now();
 
-          if (!data || !data.ok || !data.url) {
-            showFallback("Kein Türschild verfügbar<br><br>Apps Script liefert keinen Bildlink");
-            return;
-          }
+    window[callbackName] = function(data) {
+      delete window[callbackName];
 
-          if (Number(data.updatedTs) !== lastUpdatedTs) {
-            lastUpdatedTs = Number(data.updatedTs);
-            loadImage(data.url);
-          }
+      if (!data || !data.ok || !data.url) {
+        showError("Keine Daten vom Apps Script");
+        return;
+      }
 
-        } catch (err) {
-          showFallback("Fehler beim Verarbeiten<br><br>Apps Script Antwort prüfen");
-        }
-      };
+      if (Number(data.updatedTs) !== lastUpdated) {
+        lastUpdated = Number(data.updatedTs);
+        loadImage(data.url);
+      }
+    };
 
-      const script = document.createElement("script");
-      script.src = SCRIPT_URL + "?meta=1&callback=" + callbackName + "&cache=" + Date.now();
+    const script = document.createElement("script");
+    script.src = SCRIPT_URL + "?meta=1&callback=" + callbackName + "&t=" + Date.now();
 
-      script.onerror = function() {
-        showFallback("Fehler beim Laden<br><br>Apps Script / GitHub Verbindung");
-      };
+    script.onerror = function() {
+      showError("Fehler bei Verbindung zu Apps Script");
+    };
 
-      document.body.appendChild(script);
+    document.body.appendChild(script);
 
-      setTimeout(function() {
-        if (script.parentNode) {
-          script.parentNode.removeChild(script);
-        }
-      }, 15000);
-    }
+    setTimeout(() => {
+      if (script.parentNode) script.parentNode.removeChild(script);
+    }, 15000);
+  }
 
-    function loadImage(url) {
-      const testImg = new Image();
+  function loadImage(url) {
+    const test = new Image();
 
-      testImg.onload = function() {
-        img.src = url + (url.includes("?") ? "&" : "?") + "reload=" + Date.now();
-        img.style.display = "block";
-        fallback.style.display = "none";
-      };
+    test.onload = function() {
+      img.src = url + "&r=" + Date.now();
+      img.style.display = "block";
+      fallback.style.display = "none";
+    };
 
-      testImg.onerror = function() {
-        showFallback("Bild konnte nicht geladen werden<br><br>Drive-Freigabe prüfen");
-      };
+    test.onerror = function() {
+      showError("Bild konnte nicht geladen werden");
+    };
 
-      testImg.src = url + (url.includes("?") ? "&" : "?") + "test=" + Date.now();
-    }
+    test.src = url + "&test=" + Date.now();
+  }
 
-    function showFallback(text) {
-      img.style.display = "none";
-      fallback.style.display = "flex";
-      fallback.innerHTML = text;
-    }
+  function showError(text) {
+    img.style.display = "none";
+    fallback.style.display = "flex";
+    fallback.innerHTML = text;
+  }
 
-    loadMetaJsonp();
-    setInterval(loadMetaJsonp, 10000);
-  </script>
+  loadData();
+  setInterval(loadData, 10000);
+</script>
+
 </body>
 </html>
