@@ -53,7 +53,6 @@
 </head>
 
 <body>
-
   <div id="wrapper">
     <img id="schild" alt="Türschild">
   </div>
@@ -61,51 +60,65 @@
   <div id="fallback">Türschild wird geladen...</div>
 
   <script>
-    const scriptBaseUrl = "https://script.google.com/macros/s/AKfycbx7iycjDS2MtYA1sTFPiqHs2XV3G0JBlKUxfysi2UBZoVaKuNJGMM7gOAnFexj7Bssq/exec";
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbx7iycjDS2MtYA1sTFPiqHs2XV3G0JBlKUxfysi2UBZoVaKuNJGMM7gOAnFexj7Bssq/exec";
 
     const img = document.getElementById("schild");
     const fallback = document.getElementById("fallback");
 
     let lastUpdatedTs = 0;
 
-    function loadMeta() {
-      const oldScript = document.getElementById("jsonpScript");
-      if (oldScript) oldScript.remove();
+    function loadMetaJsonp() {
+      const callbackName = "tuerschildCallback_" + Date.now();
 
-      const s = document.createElement("script");
-      s.id = "jsonpScript";
-      s.src = scriptBaseUrl + "?callback=updateDoorSign&cache=" + Date.now();
-      document.body.appendChild(s);
-    }
+      window[callbackName] = function(data) {
+        try {
+          delete window[callbackName];
 
-    function updateDoorSign(data) {
-      if (!data || !data.ok || !data.url) {
-        showFallback("Kein Türschild verfügbar<br><br>Apps Script liefert keinen Bildlink");
-        return;
-      }
+          if (!data || !data.ok || !data.url) {
+            showFallback("Kein Türschild verfügbar<br><br>Apps Script liefert keinen Bildlink");
+            return;
+          }
 
-      if (Number(data.updatedTs) !== lastUpdatedTs) {
-        lastUpdatedTs = Number(data.updatedTs);
-        loadImage(data.url);
-      }
+          if (Number(data.updatedTs) !== lastUpdatedTs) {
+            lastUpdatedTs = Number(data.updatedTs);
+            loadImage(data.url);
+          }
+
+        } catch (err) {
+          showFallback("Fehler beim Verarbeiten<br><br>Apps Script Antwort prüfen");
+        }
+      };
+
+      const script = document.createElement("script");
+      script.src = SCRIPT_URL + "?meta=1&callback=" + callbackName + "&cache=" + Date.now();
+
+      script.onerror = function() {
+        showFallback("Fehler beim Laden<br><br>Apps Script / GitHub Verbindung");
+      };
+
+      document.body.appendChild(script);
+
+      setTimeout(function() {
+        if (script.parentNode) {
+          script.parentNode.removeChild(script);
+        }
+      }, 15000);
     }
 
     function loadImage(url) {
       const testImg = new Image();
 
-      const finalUrl = url + (url.includes("?") ? "&" : "?") + "reload=" + Date.now();
-
-      testImg.onload = function () {
-        img.src = finalUrl;
+      testImg.onload = function() {
+        img.src = url + (url.includes("?") ? "&" : "?") + "reload=" + Date.now();
         img.style.display = "block";
         fallback.style.display = "none";
       };
 
-      testImg.onerror = function () {
+      testImg.onerror = function() {
         showFallback("Bild konnte nicht geladen werden<br><br>Drive-Freigabe prüfen");
       };
 
-      testImg.src = finalUrl;
+      testImg.src = url + (url.includes("?") ? "&" : "?") + "test=" + Date.now();
     }
 
     function showFallback(text) {
@@ -114,11 +127,8 @@
       fallback.innerHTML = text;
     }
 
-    loadMeta();
-
-    // alle 10 Sekunden prüfen
-    setInterval(loadMeta, 10000);
+    loadMetaJsonp();
+    setInterval(loadMetaJsonp, 10000);
   </script>
-
 </body>
 </html>
