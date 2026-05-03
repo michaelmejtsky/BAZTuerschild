@@ -21,8 +21,7 @@
 
     #wrapper {
       position: fixed;
-      top: 0;
-      left: 0;
+      inset: 0;
       width: 100vw;
       height: 100vh;
       overflow: hidden;
@@ -62,39 +61,42 @@
   <div id="fallback">Türschild wird geladen...</div>
 
   <script>
-    // HIER deinen Apps-Script-Web-App-Link einsetzen:
-    const metaUrl = "https://script.google.com/macros/s/AKfycbx7iycjDS2MtYA1sTFPiqHs2XV3G0JBlKUxfysi2UBZoVaKuNJGMM7gOAnFexj7Bssq/exec?meta=1";
+    const scriptBaseUrl = "https://script.google.com/macros/s/AKfycbx7iycjDS2MtYA1sTFPiqHs2XV3G0JBlKUxfysi2UBZoVaKuNJGMM7gOAnFexj7Bssq/exec";
 
     const img = document.getElementById("schild");
     const fallback = document.getElementById("fallback");
 
     let lastUpdatedTs = 0;
 
-    async function checkForUpdate() {
-      try {
-        const res = await fetch(metaUrl + "&cache=" + Date.now());
-        const data = await res.json();
+    function loadMeta() {
+      const oldScript = document.getElementById("jsonpScript");
+      if (oldScript) oldScript.remove();
 
-        if (!data.ok || !data.url) {
-          showFallback("Kein Türschild verfügbar<br><br>Apps Script liefert keinen Bildlink");
-          return;
-        }
+      const s = document.createElement("script");
+      s.id = "jsonpScript";
+      s.src = scriptBaseUrl + "?callback=updateDoorSign&cache=" + Date.now();
+      document.body.appendChild(s);
+    }
 
-        if (Number(data.updatedTs) !== lastUpdatedTs) {
-          lastUpdatedTs = Number(data.updatedTs);
-          loadImage(data.url);
-        }
+    function updateDoorSign(data) {
+      if (!data || !data.ok || !data.url) {
+        showFallback("Kein Türschild verfügbar<br><br>Apps Script liefert keinen Bildlink");
+        return;
+      }
 
-      } catch (err) {
-        showFallback("Fehler beim Laden<br><br>Apps Script / GitHub Verbindung prüfen");
+      if (Number(data.updatedTs) !== lastUpdatedTs) {
+        lastUpdatedTs = Number(data.updatedTs);
+        loadImage(data.url);
       }
     }
 
     function loadImage(url) {
       const testImg = new Image();
 
+      const finalUrl = url + (url.includes("?") ? "&" : "?") + "reload=" + Date.now();
+
       testImg.onload = function () {
-        img.src = url;
+        img.src = finalUrl;
         img.style.display = "block";
         fallback.style.display = "none";
       };
@@ -103,7 +105,7 @@
         showFallback("Bild konnte nicht geladen werden<br><br>Drive-Freigabe prüfen");
       };
 
-      testImg.src = url + (url.includes("?") ? "&" : "?") + "reload=" + Date.now();
+      testImg.src = finalUrl;
     }
 
     function showFallback(text) {
@@ -112,10 +114,10 @@
       fallback.innerHTML = text;
     }
 
-    checkForUpdate();
+    loadMeta();
 
-    // Alle 10 Sekunden prüfen, ob ein neuer Name/Bild gesetzt wurde
-    setInterval(checkForUpdate, 10000);
+    // alle 10 Sekunden prüfen
+    setInterval(loadMeta, 10000);
   </script>
 
 </body>
