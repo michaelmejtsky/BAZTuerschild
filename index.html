@@ -6,120 +6,150 @@
   <title>BAZ Türschild</title>
 
   <style>
-    * {
+    html, body {
       margin: 0;
       padding: 0;
-      box-sizing: border-box;
-    }
-
-    html, body {
       width: 100vw;
       height: 100vh;
       overflow: hidden;
-      background: black;
-    }
-
-    #wrapper {
-      position: fixed;
-      inset: 0;
-      width: 100vw;
-      height: 100vh;
-      background: black;
+      background: #000;
     }
 
     #schild {
-      width: 100%;
-      height: 100%;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
       object-fit: fill;
       display: none;
+      border: 0;
     }
 
     #fallback {
       position: fixed;
       inset: 0;
-      background: black;
       color: white;
       font-family: Arial, sans-serif;
-      font-size: 3vw;
       display: flex;
       align-items: center;
       justify-content: center;
       text-align: center;
+      flex-direction: column;
+      padding: 40px;
+      font-size: 2.5vw;
+    }
+
+    #wappen {
+      position: fixed;
+      right: 5%;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 200px;
+      opacity: 0.9;
     }
   </style>
 </head>
 
 <body>
 
-<div id="wrapper">
-  <img id="schild" alt="Türschild">
-</div>
+<img id="schild">
+<div id="fallback"></div>
 
-<div id="fallback">Türschild wird geladen...</div>
+<!-- 👉 HIER DEIN WAPPEN LINK EINTRAGEN -->
+<img id="wappen" src="https://lh3.googleusercontent.com/d/1sRhX6ARI0fulpRUnoVScMUb3QL3B2ivO">
 
 <script>
-  const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbx7iycjDS2MtYA1sTFPiqHs2XV3G0JBlKUxfysi2UBZoVaKuNJGMM7gOAnFexj7Bssq/exec";
+  var SCRIPT_URL = "https://script.google.com/macros/s/AKfycbx7iycjDS2MtYA1sTFPiqHs2XV3G0JBlKUxfysi2UBZoVaKuNJGMM7gOAnFexj7Bssq/exec";
 
-  const img = document.getElementById("schild");
-  const fallback = document.getElementById("fallback");
+  var img = document.getElementById("schild");
+  var fallback = document.getElementById("fallback");
 
-  let lastUpdated = 0;
+  var lastUpdatedTs = 0;
+  var lastGoodUrl = "";
 
-  function loadData() {
-    const callbackName = "cb_" + Date.now();
+  var testErrorMode = false; // 🧪 TEST EIN/AUS
 
-    window[callbackName] = function(data) {
-      delete window[callbackName];
+  function showLoadingMessage() {
+    fallback.innerHTML = "Derzeit gibt es Verbindungsschwierigkeiten<br>" +
+                         "Wir arbeiten an der Problembehebung<br><br>" +
+                         "Bitte läuten Sie einfach an";
+    fallback.style.display = "flex";
+  }
 
-      if (!data || !data.ok || !data.url) {
-        showError("Keine Daten vom Apps Script");
-        return;
+  function showFinalError() {
+    fallback.innerHTML = "Fehler beim Laden<br><br>Bitte manuell läuten";
+    fallback.style.display = "flex";
+  }
+
+  function loadMeta() {
+    if (testErrorMode) {
+      showLoadingMessage();
+      setTimeout(showFinalError, 4000);
+      return;
+    }
+
+    var cb = "cb_" + new Date().getTime();
+    var done = false;
+
+    window[cb] = function(data) {
+      done = true;
+
+      try {
+        if (!data || !data.ok || !data.url) {
+          showLoadingMessage();
+          setTimeout(showFinalError, 4000);
+          return;
+        }
+
+        if (Number(data.updatedTs) !== lastUpdatedTs || data.url !== lastGoodUrl) {
+          lastUpdatedTs = Number(data.updatedTs);
+          loadImage(data.url);
+        }
+
+      } catch (e) {
+        showLoadingMessage();
+        setTimeout(showFinalError, 4000);
       }
 
-      if (Number(data.updatedTs) !== lastUpdated) {
-        lastUpdated = Number(data.updatedTs);
-        loadImage(data.url);
+      try { delete window[cb]; } catch (e) {}
+    };
+
+    var s = document.createElement("script");
+    s.src = SCRIPT_URL + "?meta=1&callback=" + cb + "&t=" + new Date().getTime();
+    document.body.appendChild(s);
+
+    setTimeout(function() {
+      if (!done) {
+        showLoadingMessage();
+        setTimeout(showFinalError, 4000);
       }
-    };
 
-    const script = document.createElement("script");
-    script.src = SCRIPT_URL + "?meta=1&callback=" + callbackName + "&t=" + Date.now();
-
-    script.onerror = function() {
-      showError("Fehler bei Verbindung zu Apps Script");
-    };
-
-    document.body.appendChild(script);
-
-    setTimeout(() => {
-      if (script.parentNode) script.parentNode.removeChild(script);
-    }, 15000);
+      if (s.parentNode) s.parentNode.removeChild(s);
+    }, 10000);
   }
 
   function loadImage(url) {
-    const test = new Image();
+    var realUrl = url + (url.indexOf("?") >= 0 ? "&" : "?") + "reload=" + new Date().getTime();
+    var test = new Image();
 
     test.onload = function() {
-      img.src = url + "&r=" + Date.now();
+      lastGoodUrl = url;
+      img.src = realUrl;
       img.style.display = "block";
       fallback.style.display = "none";
     };
 
     test.onerror = function() {
-      showError("Bild konnte nicht geladen werden");
+      showLoadingMessage();
+      setTimeout(showFinalError, 4000);
     };
 
-    test.src = url + "&test=" + Date.now();
+    test.src = realUrl;
   }
 
-  function showError(text) {
-    img.style.display = "none";
-    fallback.style.display = "flex";
-    fallback.innerHTML = text;
-  }
-
-  loadData();
-  setInterval(loadData, 10000);
+  loadMeta();
+  setInterval(loadMeta, 10000);
 </script>
 
 </body>
