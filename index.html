@@ -7,46 +7,44 @@
 
   <style>
     html, body {
-      margin: 0;
-      padding: 0;
-      width: 100vw;
-      height: 100vh;
-      overflow: hidden;
-      background: #000;
+      margin:0;
+      padding:0;
+      width:100vw;
+      height:100vh;
+      background:black;
+      overflow:hidden;
+      font-family:Arial;
     }
 
     #schild {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100vw;
-      height: 100vh;
-      object-fit: fill;
-      display: none;
-      border: 0;
+      position:fixed;
+      inset:0;
+      width:100vw;
+      height:100vh;
+      object-fit:fill;
+      display:none;
     }
 
     #fallback {
-      position: fixed;
-      inset: 0;
-      color: white;
-      font-family: Arial, sans-serif;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      text-align: center;
-      flex-direction: column;
-      padding: 40px;
-      font-size: 2.5vw;
+      position:fixed;
+      inset:0;
+      color:white;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      text-align:center;
+      padding:30px;
+      font-size:3vw;
+      flex-direction:column;
     }
 
-    #wappen {
-      position: fixed;
-      right: 5%;
-      top: 50%;
-      transform: translateY(-50%);
-      width: 200px;
-      opacity: 0.9;
+    #debug {
+      position:fixed;
+      bottom:10px;
+      left:10px;
+      color:#0f0;
+      font-size:12px;
+      opacity:0.7;
     }
   </style>
 </head>
@@ -54,102 +52,94 @@
 <body>
 
 <img id="schild">
-<div id="fallback"></div>
-
-<!-- 👉 HIER DEIN WAPPEN LINK EINTRAGEN -->
-<img id="wappen" src="https://lh3.googleusercontent.com/d/1sRhX6ARI0fulpRUnoVScMUb3QL3B2ivO">
+<div id="fallback">Lade Türschild...</div>
+<div id="debug">Start...</div>
 
 <script>
-  var SCRIPT_URL = "https://script.google.com/macros/s/AKfycbx7iycjDS2MtYA1sTFPiqHs2XV3G0JBlKUxfysi2UBZoVaKuNJGMM7gOAnFexj7Bssq/exec";
+var SCRIPT_URL = "https://script.google.com/macros/s/AKfycbx7iycjDS2MtYA1sTFPiqHs2XV3G0JBlKUxfysi2UBZoVaKuNJGMM7gOAnFexj7Bssq/exec";
 
-  var img = document.getElementById("schild");
-  var fallback = document.getElementById("fallback");
+var img = document.getElementById("schild");
+var fallback = document.getElementById("fallback");
+var debug = document.getElementById("debug");
 
-  var lastUpdatedTs = 0;
-  var lastGoodUrl = "";
+var lastUpdated = 0;
 
-  var testErrorMode = false; // 🧪 TEST EIN/AUS
+function log(msg){
+  debug.innerHTML = msg;
+  console.log(msg);
+}
 
-  function showLoadingMessage() {
-    fallback.innerHTML = "Derzeit gibt es Verbindungsschwierigkeiten<br>" +
-                         "Wir arbeiten an der Problembehebung<br><br>" +
-                         "Bitte läuten Sie einfach an";
-    fallback.style.display = "flex";
-  }
+function showError(text){
+  fallback.innerHTML = text;
+  fallback.style.display = "flex";
+}
 
-  function showFinalError() {
-    fallback.innerHTML = "Fehler beim Laden<br><br>Bitte manuell läuten";
-    fallback.style.display = "flex";
-  }
+function loadMeta(){
+  var cb = "cb_" + Date.now();
+  var done = false;
 
-  function loadMeta() {
-    if (testErrorMode) {
-      showLoadingMessage();
-      setTimeout(showFinalError, 4000);
+  log("Lade Apps Script...");
+
+  window[cb] = function(data){
+    done = true;
+
+    log("Antwort erhalten");
+
+    if(!data || !data.ok){
+      showError("Apps Script Fehler");
       return;
     }
 
-    var cb = "cb_" + new Date().getTime();
-    var done = false;
+    if(!data.url){
+      showError("Kein Bildlink");
+      return;
+    }
 
-    window[cb] = function(data) {
-      done = true;
+    log("Bild wird geladen...");
 
-      try {
-        if (!data || !data.ok || !data.url) {
-          showLoadingMessage();
-          setTimeout(showFinalError, 4000);
-          return;
-        }
+    loadImage(data.url);
+  };
 
-        if (Number(data.updatedTs) !== lastUpdatedTs || data.url !== lastGoodUrl) {
-          lastUpdatedTs = Number(data.updatedTs);
-          loadImage(data.url);
-        }
+  var s = document.createElement("script");
+  s.src = SCRIPT_URL + "?meta=1&callback=" + cb + "&t=" + Date.now();
 
-      } catch (e) {
-        showLoadingMessage();
-        setTimeout(showFinalError, 4000);
-      }
+  s.onerror = function(){
+    log("Script Fehler");
+    showError("Verbindung Apps Script fehlgeschlagen");
+  };
 
-      try { delete window[cb]; } catch (e) {}
-    };
+  document.body.appendChild(s);
 
-    var s = document.createElement("script");
-    s.src = SCRIPT_URL + "?meta=1&callback=" + cb + "&t=" + new Date().getTime();
-    document.body.appendChild(s);
+  setTimeout(function(){
+    if(!done){
+      log("Timeout");
+      showError("Timeout bei Apps Script");
+    }
+  },10000);
+}
 
-    setTimeout(function() {
-      if (!done) {
-        showLoadingMessage();
-        setTimeout(showFinalError, 4000);
-      }
+function loadImage(url){
+  var real = url + "&r=" + Date.now();
 
-      if (s.parentNode) s.parentNode.removeChild(s);
-    }, 10000);
-  }
+  var test = new Image();
 
-  function loadImage(url) {
-    var realUrl = url + (url.indexOf("?") >= 0 ? "&" : "?") + "reload=" + new Date().getTime();
-    var test = new Image();
+  test.onload = function(){
+    log("Bild OK");
 
-    test.onload = function() {
-      lastGoodUrl = url;
-      img.src = realUrl;
-      img.style.display = "block";
-      fallback.style.display = "none";
-    };
+    img.src = real;
+    img.style.display = "block";
+    fallback.style.display = "none";
+  };
 
-    test.onerror = function() {
-      showLoadingMessage();
-      setTimeout(showFinalError, 4000);
-    };
+  test.onerror = function(){
+    log("Bild Fehler");
+    showError("Bild konnte nicht geladen werden");
+  };
 
-    test.src = realUrl;
-  }
+  test.src = real;
+}
 
-  loadMeta();
-  setInterval(loadMeta, 10000);
+loadMeta();
 </script>
 
 </body>
