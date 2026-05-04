@@ -69,20 +69,26 @@
   // 🔥 TESTMODUS über URL
   var testErrorMode = window.location.search.indexOf("testfehler=1") !== -1;
 
-  function showLoadingMessage() {
-    fallback.innerHTML =
-      "Derzeit gibt es Verbindungsschwierigkeiten<br>" +
-      "Wir arbeiten an der Problembehebung<br><br>" +
-      "Bitte läuten Sie einfach an";
-    fallback.style.display = "flex";
-  }
+ function showLoadingMessage() {
+  img.style.display = "none";
 
-  function showFinalError() {
-    fallback.innerHTML =
-      "Fehler beim Laden<br><br>" +
-      "Bitte läuten Sie manuell";
-    fallback.style.display = "flex";
-  }
+  fallback.innerHTML =
+    "Derzeit gibt es Verbindungsschwierigkeiten<br>" +
+    "Wir arbeiten an der Problembehebung<br><br>" +
+    "Bitte läuten Sie einfach an";
+
+  fallback.style.display = "flex";
+}
+
+function showFinalError() {
+  img.style.display = "none";
+
+  fallback.innerHTML =
+    "Fehler beim Laden<br><br>" +
+    "Bitte läuten Sie manuell";
+
+  fallback.style.display = "flex";
+}
 
   function loadMeta() {
 
