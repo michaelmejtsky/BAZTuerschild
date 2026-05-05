@@ -1,166 +1,136 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>BAZ Türschild</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <style>
-    html, body {
-      margin: 0;
-      padding: 0;
-      width: 100vw;
-      height: 100vh;
-      overflow: hidden;
-      background: black;
-      font-family: Arial, sans-serif;
-    }
+<title>BAZ Türschild</title>
 
-    #schild {
-      position: fixed;
-      inset: 0;
-      width: 100vw;
-      height: 100vh;
-      object-fit: fill;
-      display: none;
-    }
+<style>
+html, body {
+  margin:0;
+  padding:0;
+  width:100vw;
+  height:100vh;
+  background:black;
+  overflow:hidden;
+  font-family:Arial, sans-serif;
+}
 
-    #fallback {
-      position: fixed;
-      inset: 0;
-      color: white;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      text-align: center;
-      flex-direction: column;
-      padding: 40px;
-      font-size: 2.5vw;
-    }
+#schild {
+  position:fixed;
+  inset:0;
+  width:100vw;
+  height:100vh;
+  object-fit:fill;
+  display:block;
+  z-index:1;
+}
 
-    #wappen {
-      position: fixed;
-      right: 5%;
-      top: 50%;
-      transform: translateY(-50%);
-      width: 180px;
-      opacity: 0.9;
-    }
-  </style>
+#meldung {
+  position:fixed;
+  inset:0;
+  background:black;
+  color:white;
+  display:none;
+  align-items:center;
+  justify-content:center;
+  text-align:center;
+  flex-direction:column;
+  font-size:2.4vw;
+  padding:40px;
+  z-index:10;
+}
+
+#meldungText {
+  max-width:65%;
+  line-height:1.35;
+}
+
+#wappen {
+  position:fixed;
+  right:6%;
+  top:50%;
+  transform:translateY(-50%);
+  width:190px;
+  max-width:18vw;
+  z-index:20;
+  opacity:0.95;
+}
+</style>
 </head>
 
 <body>
 
-<img id="schild">
-<div id="fallback">Türschild wird geladen...</div>
+<img id="schild" alt="BAZ Türschild">
 
-<!-- 👉 DEIN WAPPEN -->
-<img id="wappen" src="https://lh3.googleusercontent.com/d/1sRhX6ARI0fulpRUnoVScMUb3QL3B2ivO">
+<div id="meldung">
+  <div id="meldungText">
+    Derzeit gibt es Verbindungsschwierigkeiten.<br>
+    Wir arbeiten an der Problembehebung.<br><br>
+    Bitte läuten Sie einfach an.
+  </div>
+  <img id="wappen" src="https://lh3.googleusercontent.com/d/1sRhX6ARI0fulpRUnoVScMUb3QL3B2ivO" alt="Wappen">
+</div>
 
 <script>
-  var SCRIPT_URL = "https://script.google.com/macros/s/AKfycbx7iycjDS2MtYA1sTFPiqHs2XV3G0JBlKUxfysi2UBZoVaKuNJGMM7gOAnFexj7Bssq/exec";
+var SCRIPT_URL = "https://script.google.com/macros/s/AKfycbx7iycjDS2MtYA1sTFPiqHs2XV3G0JBlKUxfysi2UBZoVaKuNJGMM7gOAnFexj7Bssq/exec";
 
-  var img = document.getElementById("schild");
-  var fallback = document.getElementById("fallback");
+var img = document.getElementById("schild");
+var meldung = document.getElementById("meldung");
 
-  var lastUpdatedTs = 0;
-  var lastGoodUrl = "";
+var currentUrl = "";
+var lastSuccess = Date.now();
 
-  // 🔥 TESTMODUS über URL
-  var testErrorMode = window.location.search.indexOf("testfehler=1") !== -1;
+function update() {
+  var cb = "cb_" + Date.now();
+  var responded = false;
 
- function showLoadingMessage() {
-  img.style.display = "none";
+  window[cb] = function(data) {
+    responded = true;
 
-  fallback.innerHTML =
-    "Derzeit gibt es Verbindungsschwierigkeiten<br>" +
-    "Wir arbeiten an der Problembehebung<br><br>" +
-    "Bitte läuten Sie einfach an";
+    if (data && data.ok && data.url) {
+      lastSuccess = Date.now();
+      meldung.style.display = "none";
 
-  fallback.style.display = "flex";
-}
-
-function showFinalError() {
-  img.style.display = "none";
-
-  fallback.innerHTML =
-    "Verbindungsfehler<br><br>" +
-    "Bitte läuten Sie einfach an";
-
-  fallback.style.display = "flex";
-}
-
-  function loadMeta() {
-
-    // 🧪 Testmodus
-    if (testErrorMode) {
-      showLoadingMessage();
-      setTimeout(showFinalError, 4000);
-      return;
+      if (data.url !== currentUrl) {
+        currentUrl = data.url;
+        img.src = currentUrl + (currentUrl.indexOf("?") >= 0 ? "&" : "?") + "r=" + Date.now();
+      }
+    } else {
+      checkFallback();
     }
 
-    var cb = "cb_" + new Date().getTime();
-    var done = false;
+    try { delete window[cb]; } catch(e) {}
+    if (script && script.parentNode) script.parentNode.removeChild(script);
+  };
 
-    window[cb] = function(data) {
-      done = true;
+  var script = document.createElement("script");
+  script.src = SCRIPT_URL + "?meta=1&callback=" + cb + "&t=" + Date.now();
+  document.body.appendChild(script);
 
-      try {
-        if (!data || !data.ok || !data.url) {
-          showLoadingMessage();
-          setTimeout(showFinalError, 4000);
-          return;
-        }
+  setTimeout(function() {
+    if (!responded) {
+      checkFallback();
+    }
+    if (script && script.parentNode) script.parentNode.removeChild(script);
+  }, 8000);
+}
 
-        if (Number(data.updatedTs) !== lastUpdatedTs || data.url !== lastGoodUrl) {
-          lastUpdatedTs = Number(data.updatedTs);
-          loadImage(data.url);
-        }
+function checkFallback() {
+  var diff = Date.now() - lastSuccess;
 
-      } catch (e) {
-        showLoadingMessage();
-        setTimeout(showFinalError, 4000);
-      }
-
-      try { delete window[cb]; } catch(e){}
-    };
-
-    var s = document.createElement("script");
-    s.src = SCRIPT_URL + "?meta=1&callback=" + cb + "&t=" + new Date().getTime();
-    document.body.appendChild(s);
-
-    setTimeout(function() {
-      if (!done) {
-        showLoadingMessage();
-        setTimeout(showFinalError, 4000);
-      }
-
-      if (s.parentNode) s.parentNode.removeChild(s);
-    }, 10000);
+  if (!currentUrl || diff > 10000) {
+    meldung.style.display = "flex";
   }
+}
 
-  function loadImage(url) {
-    var real = url + (url.indexOf("?") >= 0 ? "&" : "?") + "reload=" + new Date().getTime();
+img.onerror = function() {
+  checkFallback();
+};
 
-    var test = new Image();
-
-    test.onload = function() {
-      lastGoodUrl = url;
-      img.src = real;
-      img.style.display = "block";
-      fallback.style.display = "none";
-    };
-
-    test.onerror = function() {
-      showLoadingMessage();
-      setTimeout(showFinalError, 4000);
-    };
-
-    test.src = real;
-  }
-
-  loadMeta();
-  setInterval(loadMeta, 10000);
+update();
+setInterval(update, 5000);
 </script>
 
 </body>
