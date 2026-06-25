@@ -57,6 +57,25 @@ html, body {
   z-index:20;
   opacity:0.95;
 }
+
+#debugPanel {
+  position:fixed;
+  left:14px;
+  bottom:14px;
+  z-index:99999;
+  display:none;
+  max-width:560px;
+  background:rgba(0,0,0,.78);
+  color:#00eaff;
+  border:1px solid rgba(0,234,255,.55);
+  border-radius:12px;
+  padding:12px 14px;
+  font-size:13px;
+  line-height:1.45;
+  text-align:left;
+  font-family:Consolas, monospace;
+  word-break:break-all;
+}
 </style>
 </head>
 
@@ -73,18 +92,22 @@ html, body {
   <img id="wappen" src="https://lh3.googleusercontent.com/d/1sRhX6ARI0fulpRUnoVScMUb3QL3B2ivO" alt="Wappen">
 </div>
 
+<div id="debugPanel">Statusdiagnose wird geladen …</div>
+
 <script>
 var SCRIPT_URL = "https://script.google.com/macros/s/AKfycbx7iycjDS2MtYA1sTFPiqHs2XV3G0JBlKUxfysi2UBZoVaKuNJGMM7gOAnFexj7Bssq/exec";
 var GLOBAL_STATUS_URL = "https://michaelmejtsky.github.io/FFSTP-Status/status.json";
 
 var img = document.getElementById("schild");
 var meldung = document.getElementById("meldung");
+var debugPanel = document.getElementById("debugPanel");
 
 var currentUrl = "";
 var lastSuccess = Date.now();
 
 var globalFallbackActive = false;
 var localFallbackActive = false;
+var debugMode = false;
 
 function showFallback() {
   meldung.style.display = "flex";
@@ -93,6 +116,12 @@ function showFallback() {
 function hideFallback() {
   if (globalFallbackActive || localFallbackActive) return;
   meldung.style.display = "none";
+}
+
+function setDebug(text) {
+  if (!debugMode) return;
+  debugPanel.style.display = "block";
+  debugPanel.innerHTML = text;
 }
 
 function update() {
@@ -152,14 +181,29 @@ img.onerror = function() {
 };
 
 async function checkGlobalFallbackStatus() {
+  var url = GLOBAL_STATUS_URL + "?nocache=" + Date.now();
+
   try {
-    var response = await fetch(GLOBAL_STATUS_URL + "?t=" + Date.now(), {
+    setDebug("Prüfe Status…<br>URL: " + url);
+
+    var response = await fetch(url, {
       cache: "no-store"
     });
 
-    var status = await response.json();
+    var text = await response.text();
+    var lower = text.toLowerCase();
 
-    if (status.fallback === true) {
+    var fallbackIsTrue = lower.includes("fallback") && lower.includes("true");
+
+    setDebug(
+      "HTTP: " + response.status + "<br>" +
+      "fallback erkannt: " + fallbackIsTrue + "<br>" +
+      "globalFallbackActive: " + globalFallbackActive + "<br>" +
+      "localFallbackActive: " + localFallbackActive + "<br>" +
+      "Antwort:<br>" + text.replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    );
+
+    if (fallbackIsTrue) {
       globalFallbackActive = true;
       showFallback();
     } else {
@@ -168,11 +212,17 @@ async function checkGlobalFallbackStatus() {
     }
 
   } catch (err) {
+    setDebug("Fetch Fehler:<br>" + String(err));
     console.log("Globaler Status konnte nicht geprüft werden:", err);
   }
 }
 
 var params = new URLSearchParams(window.location.search);
+
+if (params.has("debug") || params.get("debug") === "1") {
+  debugMode = true;
+  debugPanel.style.display = "block";
+}
 
 if (
   params.has("offline") ||
