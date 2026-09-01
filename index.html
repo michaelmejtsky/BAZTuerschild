@@ -7,6 +7,7 @@
 <title>BAZ Türschild</title>
 
 <style>
+
 html, body {
   margin:0;
   padding:0;
@@ -16,6 +17,11 @@ html, body {
   overflow:hidden;
   font-family:Arial, sans-serif;
 }
+
+
+/* =========================================================
+   NORMALES DISPONENTENBILD
+   ========================================================= */
 
 #schild {
   position:fixed;
@@ -27,217 +33,1236 @@ html, body {
   z-index:1;
 }
 
-#meldung {
+
+/* =========================================================
+   STATUS OVERLAY
+   CALL / BUSY
+   ========================================================= */
+
+#statusOverlay {
   position:fixed;
   inset:0;
-  background:black;
-  color:white;
+
   display:none;
+
   align-items:center;
   justify-content:center;
-  text-align:center;
   flex-direction:column;
-  font-size:2.4vw;
-  padding:40px;
-  z-index:10;
+
+  text-align:center;
+
+  z-index:50;
+
+  padding:4vw;
+
+  box-sizing:border-box;
 }
 
+
+/* =========================================================
+   GELB = NOTRUFGESPRÄCH
+   ========================================================= */
+
+#statusOverlay.call {
+  display:flex;
+
+  background:#f5c400;
+  color:#000000;
+}
+
+
+/* =========================================================
+   ROT = BESETZT
+   ========================================================= */
+
+#statusOverlay.busy {
+  display:flex;
+
+  background:#b00020;
+  color:#ffffff;
+}
+
+
+#statusTitle {
+
+  font-size:6vw;
+
+  font-weight:900;
+
+  line-height:1.05;
+
+  text-transform:uppercase;
+
+  max-width:90%;
+}
+
+
+#statusSubtitle {
+
+  margin-top:3vw;
+
+  font-size:3vw;
+
+  font-weight:600;
+
+  line-height:1.2;
+
+  max-width:80%;
+}
+
+
+#statusWappen {
+
+  position:absolute;
+
+  right:5vw;
+  bottom:5vh;
+
+  width:13vw;
+  max-width:190px;
+
+  opacity:0.95;
+}
+
+
+/* =========================================================
+   BESTEHENDER VERBINDUNGS-FALLBACK
+   ========================================================= */
+
+#meldung {
+
+  position:fixed;
+  inset:0;
+
+  background:black;
+  color:white;
+
+  display:none;
+
+  align-items:center;
+  justify-content:center;
+
+  text-align:center;
+  flex-direction:column;
+
+  font-size:2.4vw;
+
+  padding:40px;
+
+  z-index:100;
+}
+
+
 #meldungText {
+
   max-width:65%;
   line-height:1.35;
 }
 
+
 #wappen {
+
   position:fixed;
+
   right:6%;
   top:50%;
+
   transform:translateY(-50%);
+
   width:190px;
   max-width:18vw;
-  z-index:20;
+
+  z-index:110;
+
   opacity:0.95;
 }
 
+
+/* =========================================================
+   DEBUG
+   ========================================================= */
+
 #debugPanel {
+
   position:fixed;
+
   left:14px;
   bottom:14px;
+
   z-index:99999;
+
   display:none;
-  max-width:560px;
-  background:rgba(0,0,0,.78);
+
+  max-width:700px;
+
+  background:rgba(0,0,0,.82);
+
   color:#00eaff;
+
   border:1px solid rgba(0,234,255,.55);
+
   border-radius:12px;
+
   padding:12px 14px;
+
   font-size:13px;
+
   line-height:1.45;
+
   text-align:left;
+
   font-family:Consolas, monospace;
+
   word-break:break-all;
 }
+
 </style>
 </head>
 
+
 <body>
 
-<img id="schild" alt="BAZ Türschild">
 
-<div id="meldung">
-  <div id="meldungText">
-    Derzeit gibt es Verbindungsschwierigkeiten.<br>
-    Wir arbeiten an der Problembehebung.<br><br>
-    Bitte läuten Sie einfach an.
-  </div>
-  <img id="wappen" src="https://lh3.googleusercontent.com/d/1sRhX6ARI0fulpRUnoVScMUb3QL3B2ivO" alt="Wappen">
+<!-- ======================================================
+     NORMALES TÜRSCHILD
+     ====================================================== -->
+
+<img
+  id="schild"
+  alt="BAZ Türschild"
+>
+
+
+<!-- ======================================================
+     NEU: ELKOS STATUS OVERLAY
+     ====================================================== -->
+
+<div id="statusOverlay">
+
+  <div id="statusTitle"></div>
+
+  <div id="statusSubtitle"></div>
+
+  <img
+    id="statusWappen"
+    src="https://lh3.googleusercontent.com/d/1sRhX6ARI0fulpRUnoVScMUb3QL3B2ivO"
+    alt="Wappen"
+  >
+
 </div>
 
-<div id="debugPanel">Statusdiagnose wird geladen …</div>
+
+<!-- ======================================================
+     VERBINDUNGS-FALLBACK
+     ====================================================== -->
+
+<div id="meldung">
+
+  <div id="meldungText">
+
+    Derzeit gibt es Verbindungsschwierigkeiten.<br>
+
+    Wir arbeiten an der Problembehebung.<br><br>
+
+    Bitte läuten Sie einfach an.
+
+  </div>
+
+  <img
+    id="wappen"
+    src="https://lh3.googleusercontent.com/d/1sRhX6ARI0fulpRUnoVScMUb3QL3B2ivO"
+    alt="Wappen"
+  >
+
+</div>
+
+
+<div id="debugPanel">
+  Statusdiagnose wird geladen …
+</div>
+
+
 
 <script>
-var SCRIPT_URL = "https://script.google.com/macros/s/AKfycbx7iycjDS2MtYA1sTFPiqHs2XV3G0JBlKUxfysi2UBZoVaKuNJGMM7gOAnFexj7Bssq/exec";
-var GLOBAL_STATUS_URL = "https://michaelmejtsky.github.io/FFSTP-Status/status.json";
 
-var img = document.getElementById("schild");
-var meldung = document.getElementById("meldung");
-var debugPanel = document.getElementById("debugPanel");
 
-var currentUrl = "";
-var lastSuccess = Date.now();
+/* =========================================================
+   KONFIGURATION
+   ========================================================= */
 
-var globalFallbackActive = false;
-var localFallbackActive = false;
-var debugMode = false;
+
+var SCRIPT_URL =
+  "https://script.google.com/macros/s/AKfycbx7iycjDS2MtYA1sTFPiqHs2XV3G0JBlKUxfysi2UBZoVaKuNJGMM7gOAnFexj7Bssq/exec";
+
+
+var GLOBAL_STATUS_URL =
+  "https://michaelmejtsky.github.io/FFSTP-Status/status.json";
+
+
+/*
+ * Normale Aktualisierung:
+ * Name/Bild
+ *
+ * 30 Sekunden wie bisher
+ */
+
+var NORMAL_UPDATE_INTERVAL =
+  30000;
+
+
+/*
+ * Wenn ELKOS später aktiviert wird:
+ *
+ * Status alle 5 Sekunden.
+ */
+
+var ELKOS_UPDATE_INTERVAL =
+  5000;
+
+
+
+/* =========================================================
+   ELEMENTE
+   ========================================================= */
+
+
+var img =
+  document.getElementById("schild");
+
+
+var meldung =
+  document.getElementById("meldung");
+
+
+var debugPanel =
+  document.getElementById("debugPanel");
+
+
+var statusOverlay =
+  document.getElementById("statusOverlay");
+
+
+var statusTitle =
+  document.getElementById("statusTitle");
+
+
+var statusSubtitle =
+  document.getElementById("statusSubtitle");
+
+
+
+/* =========================================================
+   VARIABLEN
+   ========================================================= */
+
+
+var currentUrl =
+  "";
+
+
+var lastSuccess =
+  Date.now();
+
+
+var globalFallbackActive =
+  false;
+
+
+var localFallbackActive =
+  false;
+
+
+var debugMode =
+  false;
+
+
+/*
+ * ELKOS ist aktuell im Apps Script FALSE.
+ *
+ * Diese Variable wird automatisch über Apps Script gesetzt.
+ */
+
+var elkosEnabled =
+  false;
+
+
+/*
+ * Letzter ELKOS Status
+ */
+
+var currentBazStatus =
+  "DISABLED";
+
+
+/*
+ * Schneller Status-Timer
+ */
+
+var elkosTimer =
+  null;
+
+
+
+/* =========================================================
+   FALLBACK
+   ========================================================= */
+
 
 function showFallback() {
-  meldung.style.display = "flex";
+
+  meldung.style.display =
+    "flex";
 }
+
 
 function hideFallback() {
-  if (globalFallbackActive || localFallbackActive) return;
-  meldung.style.display = "none";
-}
 
-function setDebug(text) {
-  if (!debugMode) return;
-  debugPanel.style.display = "block";
-  debugPanel.innerHTML = text;
-}
+  if (
+    globalFallbackActive ||
+    localFallbackActive
+  ) {
 
-function update() {
-  if (globalFallbackActive) {
-    showFallback();
     return;
   }
 
-  var cb = "cb_" + Date.now();
-  var responded = false;
-  var script;
 
-  window[cb] = function(data) {
-    responded = true;
-
-    if (data && data.ok && data.url) {
-      lastSuccess = Date.now();
-      localFallbackActive = false;
-      hideFallback();
-
-      if (data.url !== currentUrl) {
-        currentUrl = data.url;
-        img.src = currentUrl + (currentUrl.indexOf("?") >= 0 ? "&" : "?") + "r=" + Date.now();
-      }
-    } else {
-      checkFallback();
-    }
-
-    try { delete window[cb]; } catch(e) {}
-    if (script && script.parentNode) script.parentNode.removeChild(script);
-  };
-
-  script = document.createElement("script");
-  script.src = SCRIPT_URL + "?meta=1&callback=" + cb + "&t=" + Date.now();
-  document.body.appendChild(script);
-
-  setTimeout(function() {
-    if (!responded) {
-      checkFallback();
-    }
-    if (script && script.parentNode) script.parentNode.removeChild(script);
-  }, 8000);
+  meldung.style.display =
+    "none";
 }
 
-function checkFallback() {
-  var diff = Date.now() - lastSuccess;
 
-  if (!currentUrl || diff > 10000) {
-    localFallbackActive = true;
+
+/* =========================================================
+   DEBUG
+   ========================================================= */
+
+
+function setDebug(text) {
+
+  if (!debugMode) {
+    return;
+  }
+
+
+  debugPanel.style.display =
+    "block";
+
+
+  debugPanel.innerHTML =
+    text;
+}
+
+
+
+/* =========================================================
+   STATUS OVERLAY AUS
+   ========================================================= */
+
+
+function hideStatusOverlay() {
+
+  statusOverlay.className =
+    "";
+
+  statusOverlay.style.display =
+    "none";
+
+
+  statusTitle.innerHTML =
+    "";
+
+
+  statusSubtitle.innerHTML =
+    "";
+}
+
+
+
+/* =========================================================
+   GELB
+   DISPONENT IM NOTRUFGESPRÄCH
+   ========================================================= */
+
+
+function showCallStatus() {
+
+  statusOverlay.className =
+    "call";
+
+
+  statusOverlay.style.display =
+    "flex";
+
+
+  statusTitle.innerHTML =
+    "DISPONENT<br>IM NOTRUFGESPRÄCH";
+
+
+  statusSubtitle.innerHTML =
+    "Bitte nicht eintreten";
+}
+
+
+
+/* =========================================================
+   ROT
+   DISPONENT BESETZT
+   ========================================================= */
+
+
+function showBusyStatus() {
+
+  statusOverlay.className =
+    "busy";
+
+
+  statusOverlay.style.display =
+    "flex";
+
+
+  statusTitle.innerHTML =
+    "DISPONENT<br>BESETZT";
+
+
+  statusSubtitle.innerHTML =
+    "BITTE WARTEN";
+}
+
+
+
+/* =========================================================
+   BAZ STATUS AUSWERTEN
+   ========================================================= */
+
+
+function applyBazStatus(data) {
+
+
+  /*
+   * ELKOS Schalter aus Apps Script übernehmen
+   */
+
+  elkosEnabled =
+    !!(
+      data &&
+      data.bazStatusEnabled === true
+    );
+
+
+  currentBazStatus =
+    data &&
+    data.bazStatus
+      ? String(data.bazStatus)
+      : "UNKNOWN";
+
+
+  /*
+   * GANZ WICHTIG:
+   *
+   * ELKOS deaktiviert
+   *
+   * -> normale Anzeige
+   * -> absolut keine Änderung am Türschild
+   */
+
+  if (!elkosEnabled) {
+
+    hideStatusOverlay();
+
+    stopFastElkosPolling();
+
+    return;
+  }
+
+
+  /*
+   * ELKOS aktiv
+   *
+   * schnellen Timer aktivieren
+   */
+
+  startFastElkosPolling();
+
+
+  /*
+   * PRIORITÄT
+   */
+
+
+  if (
+    currentBazStatus ===
+    "CALL"
+  ) {
+
+    showCallStatus();
+
+    return;
+  }
+
+
+  if (
+    currentBazStatus ===
+    "BUSY"
+  ) {
+
+    showBusyStatus();
+
+    return;
+  }
+
+
+  /*
+   * NORMAL
+   * UNKNOWN
+   * OFFLINE
+   * DISABLED
+   *
+   * niemals falschen Warnstatus anzeigen
+   */
+
+  hideStatusOverlay();
+}
+
+
+
+/* =========================================================
+   APPS SCRIPT DATEN HOLEN
+   ========================================================= */
+
+
+function requestMeta(
+  callbackFunction
+) {
+
+
+  var cb =
+    "cb_" +
+    Date.now() +
+    "_" +
+    Math.floor(
+      Math.random() *
+      100000
+    );
+
+
+  var responded =
+    false;
+
+
+  var script;
+
+
+  window[cb] =
+    function(data) {
+
+
+      responded =
+        true;
+
+
+      /*
+       * Daten gültig
+       */
+
+      if (
+        data &&
+        data.ok &&
+        data.url
+      ) {
+
+
+        lastSuccess =
+          Date.now();
+
+
+        localFallbackActive =
+          false;
+
+
+        hideFallback();
+
+
+        /*
+         * Bild nur dann neu laden,
+         * wenn sich URL wirklich geändert hat.
+         */
+
+        if (
+          data.url !==
+          currentUrl
+        ) {
+
+
+          currentUrl =
+            data.url;
+
+
+          img.src =
+            currentUrl +
+
+            (
+              currentUrl.indexOf("?") >= 0
+                ? "&"
+                : "?"
+            ) +
+
+            "r=" +
+            Date.now();
+        }
+
+
+        /*
+         * NEU:
+         * ELKOS Status behandeln
+         */
+
+        applyBazStatus(
+          data
+        );
+
+
+        /*
+         * DEBUG
+         */
+
+        if (debugMode) {
+
+
+          var aps =
+            data.bazArbeitsplaetze ||
+            [];
+
+
+          var apText =
+            aps.map(
+              function(ap) {
+
+                return (
+
+                  (ap.arbeitsplatzName || "?") +
+
+                  " | " +
+
+                  (ap.disponentName || "-") +
+
+                  " | " +
+
+                  (ap.verfuegbarkeit || "?")
+                );
+
+              }
+            )
+            .join("<br>");
+
+
+          setDebug(
+
+            "Türschild OK" +
+
+            "<br>Disponent: " +
+            (
+              data.name ||
+              "-"
+            ) +
+
+            "<br>ELKOS aktiviert: " +
+            elkosEnabled +
+
+            "<br>BAZ Status: " +
+            currentBazStatus +
+
+            "<br>BAZ Status OK: " +
+            data.bazStatusOk +
+
+            "<br>BAZ Meldung: " +
+            (
+              data.bazStatusMessage ||
+              "-"
+            ) +
+
+            "<br><br>St. Pölten Arbeitsplätze:<br>" +
+
+            (
+              apText ||
+              "keine Daten"
+            )
+          );
+        }
+
+
+      } else {
+
+
+        checkFallback();
+      }
+
+
+      /*
+       * Aufräumen
+       */
+
+      try {
+
+        delete window[cb];
+
+      } catch(e) {}
+
+
+      if (
+        script &&
+        script.parentNode
+      ) {
+
+        script.parentNode
+          .removeChild(
+            script
+          );
+      }
+
+
+      if (
+        typeof callbackFunction ===
+        "function"
+      ) {
+
+        callbackFunction(
+          data
+        );
+      }
+    };
+
+
+  /*
+   * JSONP Script
+   */
+
+  script =
+    document.createElement(
+      "script"
+    );
+
+
+  script.src =
+
+    SCRIPT_URL +
+
+    "?meta=1" +
+
+    "&callback=" +
+    cb +
+
+    "&t=" +
+    Date.now();
+
+
+  document.body
+    .appendChild(
+      script
+    );
+
+
+  /*
+   * Timeout
+   */
+
+  setTimeout(
+    function() {
+
+
+      if (!responded) {
+
+        checkFallback();
+      }
+
+
+      if (
+        script &&
+        script.parentNode
+      ) {
+
+        script.parentNode
+          .removeChild(
+            script
+          );
+      }
+
+
+    },
+    8000
+  );
+}
+
+
+
+/* =========================================================
+   NORMALES UPDATE
+   ========================================================= */
+
+
+function update() {
+
+
+  if (
+    globalFallbackActive
+  ) {
+
+    showFallback();
+
+    return;
+  }
+
+
+  requestMeta();
+}
+
+
+
+/* =========================================================
+   SCHNELLES ELKOS UPDATE
+   ========================================================= */
+
+
+function elkosUpdate() {
+
+
+  if (
+    !elkosEnabled
+  ) {
+
+    return;
+  }
+
+
+  if (
+    globalFallbackActive
+  ) {
+
+    return;
+  }
+
+
+  requestMeta();
+}
+
+
+
+/* =========================================================
+   SCHNELLEN ELKOS TIMER STARTEN
+   ========================================================= */
+
+
+function startFastElkosPolling() {
+
+
+  if (
+    elkosTimer !==
+    null
+  ) {
+
+    return;
+  }
+
+
+  elkosTimer =
+    setInterval(
+
+      elkosUpdate,
+
+      ELKOS_UPDATE_INTERVAL
+    );
+}
+
+
+
+/* =========================================================
+   SCHNELLEN ELKOS TIMER STOPPEN
+   ========================================================= */
+
+
+function stopFastElkosPolling() {
+
+
+  if (
+    elkosTimer ===
+    null
+  ) {
+
+    return;
+  }
+
+
+  clearInterval(
+    elkosTimer
+  );
+
+
+  elkosTimer =
+    null;
+}
+
+
+
+/* =========================================================
+   FALLBACK PRÜFEN
+   ========================================================= */
+
+
+function checkFallback() {
+
+
+  var diff =
+    Date.now() -
+    lastSuccess;
+
+
+  if (
+    !currentUrl ||
+    diff >
+      10000
+  ) {
+
+
+    localFallbackActive =
+      true;
+
+
     showFallback();
   }
 }
 
-img.onerror = function() {
-  localFallbackActive = true;
-  showFallback();
-};
+
+
+/* =========================================================
+   BILD FEHLER
+   ========================================================= */
+
+
+img.onerror =
+  function() {
+
+
+    localFallbackActive =
+      true;
+
+
+    showFallback();
+  };
+
+
+
+/* =========================================================
+   GLOBALER FFSTP FALLBACK
+   ========================================================= */
+
 
 async function checkGlobalFallbackStatus() {
-  var url = GLOBAL_STATUS_URL + "?nocache=" + Date.now();
+
+
+  var url =
+
+    GLOBAL_STATUS_URL +
+
+    "?nocache=" +
+
+    Date.now();
+
 
   try {
-    setDebug("Prüfe Status…<br>URL: " + url);
 
-    var response = await fetch(url, {
-      cache: "no-store"
-    });
 
-    var text = await response.text();
-    var lower = text.toLowerCase();
+    var response =
+      await fetch(
 
-    var fallbackIsTrue = lower.includes("fallback") && lower.includes("true");
+        url,
 
-    setDebug(
-      "HTTP: " + response.status + "<br>" +
-      "fallback erkannt: " + fallbackIsTrue + "<br>" +
-      "globalFallbackActive: " + globalFallbackActive + "<br>" +
-      "localFallbackActive: " + localFallbackActive + "<br>" +
-      "Antwort:<br>" + text.replace(/</g, "&lt;").replace(/>/g, "&gt;")
-    );
+        {
+          cache:
+            "no-store"
+        }
+      );
 
-    if (fallbackIsTrue) {
-      globalFallbackActive = true;
+
+    var text =
+      await response.text();
+
+
+    var lower =
+      text.toLowerCase();
+
+
+    var fallbackIsTrue =
+
+      lower.includes(
+        "fallback"
+      )
+
+      &&
+
+      lower.includes(
+        "true"
+      );
+
+
+    if (
+      fallbackIsTrue
+    ) {
+
+
+      globalFallbackActive =
+        true;
+
+
       showFallback();
+
+
     } else {
-      globalFallbackActive = false;
+
+
+      globalFallbackActive =
+        false;
+
+
       hideFallback();
     }
 
+
   } catch (err) {
-    setDebug("Fetch Fehler:<br>" + String(err));
-    console.log("Globaler Status konnte nicht geprüft werden:", err);
+
+
+    if (debugMode) {
+
+
+      setDebug(
+
+        "Globaler Status Fehler:<br>" +
+
+        String(err)
+      );
+    }
+
+
+    console.log(
+
+      "Globaler Status konnte nicht geprüft werden:",
+
+      err
+    );
   }
 }
 
-var params = new URLSearchParams(window.location.search);
 
-if (params.has("debug") || params.get("debug") === "1") {
-  debugMode = true;
-  debugPanel.style.display = "block";
-}
+
+/* =========================================================
+   URL PARAMETER
+   ========================================================= */
+
+
+var params =
+  new URLSearchParams(
+    window.location.search
+  );
+
+
+
+/* =========================================================
+   DEBUG MODUS
+   ========================================================= */
+
 
 if (
-  params.has("offline") ||
-  params.has("testoffline") ||
-  params.get("test") === "offline"
+  params.has("debug") ||
+  params.get("debug") === "1"
 ) {
-  globalFallbackActive = true;
+
+
+  debugMode =
+    true;
+
+
+  debugPanel.style.display =
+    "block";
+}
+
+
+
+/* =========================================================
+   OFFLINE TEST
+   ========================================================= */
+
+
+if (
+
+  params.has("offline")
+
+  ||
+
+  params.has("testoffline")
+
+  ||
+
+  params.get("test") ===
+    "offline"
+
+) {
+
+
+  globalFallbackActive =
+    true;
+
+
   showFallback();
 }
 
+
+
+/* =========================================================
+   START
+   ========================================================= */
+
+
+hideStatusOverlay();
+
+
 update();
+
+
 checkGlobalFallbackStatus();
 
-setInterval(update, 30000);
-setInterval(checkGlobalFallbackStatus, 10000);
+
+
+/* =========================================================
+   TIMER
+   ========================================================= */
+
+
+/*
+ * Normaler Türschild-Check
+ *
+ * bleibt 30 Sekunden wie bisher.
+ */
+
+setInterval(
+
+  update,
+
+  NORMAL_UPDATE_INTERVAL
+);
+
+
+/*
+ * Globaler Fallback
+ *
+ * wie bisher alle 10 Sekunden.
+ */
+
+setInterval(
+
+  checkGlobalFallbackStatus,
+
+  10000
+);
+
+
 </script>
 
 </body>
