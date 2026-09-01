@@ -8,14 +8,15 @@
 
 <style>
 
-html, body {
-  margin:0;
-  padding:0;
-  width:100vw;
-  height:100vh;
-  background:black;
-  overflow:hidden;
-  font-family:Arial, sans-serif;
+html,
+body {
+  margin: 0;
+  padding: 0;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background: #000;
+  font-family: Arial, Helvetica, sans-serif;
 }
 
 
@@ -24,104 +25,109 @@ html, body {
    ========================================================= */
 
 #schild {
-  position:fixed;
-  inset:0;
-  width:100vw;
-  height:100vh;
-  object-fit:fill;
-  display:block;
-  z-index:1;
+  position: fixed;
+  inset: 0;
+
+  width: 100vw;
+  height: 100vh;
+
+  object-fit: fill;
+
+  display: block;
+
+  z-index: 1;
 }
 
 
 /* =========================================================
-   STATUS OVERLAY
-   CALL / BUSY
+   ELKOS STATUSANZEIGE
    ========================================================= */
 
 #statusOverlay {
-  position:fixed;
-  inset:0;
+  position: fixed;
+  inset: 0;
 
-  display:none;
+  display: none;
 
-  align-items:center;
-  justify-content:center;
-  flex-direction:column;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
 
-  text-align:center;
+  text-align: center;
 
-  z-index:50;
+  box-sizing: border-box;
 
-  padding:4vw;
+  padding: 4vw;
 
-  box-sizing:border-box;
+  z-index: 50;
 }
 
 
 /* =========================================================
-   GELB = NOTRUFGESPRÄCH
+   GELB
+   NOTRUFGESPRÄCH
    ========================================================= */
 
 #statusOverlay.call {
-  display:flex;
+  display: flex;
 
-  background:#f5c400;
-  color:#000000;
+  background: #f5c400;
+
+  color: #000;
 }
 
 
 /* =========================================================
-   ROT = BESETZT
+   ROT
+   BESETZT
    ========================================================= */
 
 #statusOverlay.busy {
-  display:flex;
+  display: flex;
 
-  background:#b00020;
-  color:#ffffff;
+  background: #b00020;
+
+  color: #fff;
 }
 
 
 #statusTitle {
+  font-size: 6vw;
 
-  font-size:6vw;
+  font-weight: 900;
 
-  font-weight:900;
+  line-height: 1.05;
 
-  line-height:1.05;
+  text-transform: uppercase;
 
-  text-transform:uppercase;
-
-  max-width:90%;
+  max-width: 92%;
 }
 
 
 #statusSubtitle {
+  margin-top: 3vw;
 
-  margin-top:3vw;
+  font-size: 3.2vw;
 
-  font-size:3vw;
+  font-weight: 700;
 
-  font-weight:600;
+  line-height: 1.2;
 
-  line-height:1.2;
-
-  max-width:80%;
+  max-width: 85%;
 }
 
 
 #statusWappen {
+  position: absolute;
 
-  position:absolute;
+  right: 5vw;
+  bottom: 5vh;
 
-  right:5vw;
-  bottom:5vh;
+  width: 13vw;
 
-  width:13vw;
-  max-width:190px;
+  max-width: 190px;
 
-  opacity:0.95;
+  opacity: 0.95;
 }
 
 
@@ -130,51 +136,54 @@ html, body {
    ========================================================= */
 
 #meldung {
+  position: fixed;
+  inset: 0;
 
-  position:fixed;
-  inset:0;
+  display: none;
 
-  background:black;
-  color:white;
+  align-items: center;
+  justify-content: center;
 
-  display:none;
+  flex-direction: column;
 
-  align-items:center;
-  justify-content:center;
+  background: #000;
 
-  text-align:center;
-  flex-direction:column;
+  color: #fff;
 
-  font-size:2.4vw;
+  text-align: center;
 
-  padding:40px;
+  font-size: 2.4vw;
 
-  z-index:100;
+  padding: 40px;
+
+  box-sizing: border-box;
+
+  z-index: 100;
 }
 
 
 #meldungText {
+  max-width: 65%;
 
-  max-width:65%;
-  line-height:1.35;
+  line-height: 1.35;
 }
 
 
 #wappen {
+  position: fixed;
 
-  position:fixed;
+  right: 6%;
+  top: 50%;
 
-  right:6%;
-  top:50%;
+  transform: translateY(-50%);
 
-  transform:translateY(-50%);
+  width: 190px;
 
-  width:190px;
-  max-width:18vw;
+  max-width: 18vw;
 
-  z-index:110;
+  z-index: 110;
 
-  opacity:0.95;
+  opacity: 0.95;
 }
 
 
@@ -183,37 +192,38 @@ html, body {
    ========================================================= */
 
 #debugPanel {
+  position: fixed;
 
-  position:fixed;
+  left: 14px;
+  bottom: 14px;
 
-  left:14px;
-  bottom:14px;
+  display: none;
 
-  z-index:99999;
+  max-width: 720px;
 
-  display:none;
+  background: rgba(0, 0, 0, 0.85);
 
-  max-width:700px;
+  color: #00eaff;
 
-  background:rgba(0,0,0,.82);
+  border: 1px solid rgba(0, 234, 255, 0.55);
 
-  color:#00eaff;
+  border-radius: 12px;
 
-  border:1px solid rgba(0,234,255,.55);
+  padding: 12px 14px;
 
-  border-radius:12px;
+  box-sizing: border-box;
 
-  padding:12px 14px;
+  z-index: 99999;
 
-  font-size:13px;
+  font-size: 13px;
 
-  line-height:1.45;
+  line-height: 1.45;
 
-  text-align:left;
+  text-align: left;
 
-  font-family:Consolas, monospace;
+  font-family: Consolas, monospace;
 
-  word-break:break-all;
+  word-break: break-word;
 }
 
 </style>
@@ -224,7 +234,7 @@ html, body {
 
 
 <!-- ======================================================
-     NORMALES TÜRSCHILD
+     NORMALES DISPONENTENBILD
      ====================================================== -->
 
 <img
@@ -234,7 +244,7 @@ html, body {
 
 
 <!-- ======================================================
-     NEU: ELKOS STATUS OVERLAY
+     ELKOS STATUS
      ====================================================== -->
 
 <div id="statusOverlay">
@@ -253,7 +263,7 @@ html, body {
 
 
 <!-- ======================================================
-     VERBINDUNGS-FALLBACK
+     VERBINDUNGSFALLBACK
      ====================================================== -->
 
 <div id="meldung">
@@ -277,6 +287,10 @@ html, body {
 </div>
 
 
+<!-- ======================================================
+     DEBUG
+     ====================================================== -->
+
 <div id="debugPanel">
   Statusdiagnose wird geladen …
 </div>
@@ -291,19 +305,25 @@ html, body {
    ========================================================= */
 
 
+/*
+ * DEIN BESTEHENDES APPS SCRIPT
+ */
+
 var SCRIPT_URL =
   "https://script.google.com/macros/s/AKfycbx7iycjDS2MtYA1sTFPiqHs2XV3G0JBlKUxfysi2UBZoVaKuNJGMM7gOAnFexj7Bssq/exec";
 
+
+/*
+ * DEIN BESTEHENDER GLOBALER FALLBACK
+ */
 
 var GLOBAL_STATUS_URL =
   "https://michaelmejtsky.github.io/FFSTP-Status/status.json";
 
 
 /*
- * Normale Aktualisierung:
- * Name/Bild
- *
- * 30 Sekunden wie bisher
+ * Normales Türschild:
+ * alle 30 Sekunden
  */
 
 var NORMAL_UPDATE_INTERVAL =
@@ -311,9 +331,11 @@ var NORMAL_UPDATE_INTERVAL =
 
 
 /*
- * Wenn ELKOS später aktiviert wird:
+ * Wenn ELKOS aktiv ist:
+ * Status alle 5 Sekunden
  *
- * Status alle 5 Sekunden.
+ * Solange ELKOS deaktiviert ist,
+ * wird dieser Timer NICHT gestartet.
  */
 
 var ELKOS_UPDATE_INTERVAL =
@@ -325,17 +347,12 @@ var ELKOS_UPDATE_INTERVAL =
    ELEMENTE
    ========================================================= */
 
-
 var img =
   document.getElementById("schild");
 
 
 var meldung =
   document.getElementById("meldung");
-
-
-var debugPanel =
-  document.getElementById("debugPanel");
 
 
 var statusOverlay =
@@ -350,11 +367,14 @@ var statusSubtitle =
   document.getElementById("statusSubtitle");
 
 
+var debugPanel =
+  document.getElementById("debugPanel");
+
+
 
 /* =========================================================
-   VARIABLEN
+   STATUSVARIABLEN
    ========================================================= */
-
 
 var currentUrl =
   "";
@@ -372,41 +392,92 @@ var localFallbackActive =
   false;
 
 
-var debugMode =
-  false;
-
-
-/*
- * ELKOS ist aktuell im Apps Script FALSE.
- *
- * Diese Variable wird automatisch über Apps Script gesetzt.
- */
-
 var elkosEnabled =
   false;
 
-
-/*
- * Letzter ELKOS Status
- */
 
 var currentBazStatus =
   "DISABLED";
 
 
-/*
- * Schneller Status-Timer
- */
-
 var elkosTimer =
   null;
+
+
+var debugMode =
+  false;
+
+
+/*
+ * Optionaler UI-Testmodus.
+ *
+ * Dadurch können wir Gelb/Rot testen,
+ * OHNE ELKOS zu aktivieren.
+ */
+
+var uiTestMode =
+  "";
+
+
+
+/* =========================================================
+   URL PARAMETER
+   ========================================================= */
+
+var params =
+  new URLSearchParams(
+    window.location.search
+  );
+
+
+/*
+ * Debug:
+ *
+ * ?debug=1
+ */
+
+if (
+  params.has("debug") ||
+  params.get("debug") === "1"
+) {
+
+  debugMode =
+    true;
+
+  debugPanel.style.display =
+    "block";
+}
+
+
+/*
+ * UI Test:
+ *
+ * ?test=call
+ * ?test=busy
+ * ?test=normal
+ */
+
+var requestedTest =
+  String(
+    params.get("test") || ""
+  ).toLowerCase();
+
+
+if (
+  requestedTest === "call" ||
+  requestedTest === "busy" ||
+  requestedTest === "normal"
+) {
+
+  uiTestMode =
+    requestedTest;
+}
 
 
 
 /* =========================================================
    FALLBACK
    ========================================================= */
-
 
 function showFallback() {
 
@@ -436,10 +507,10 @@ function hideFallback() {
    DEBUG
    ========================================================= */
 
-
 function setDebug(text) {
 
   if (!debugMode) {
+
     return;
   }
 
@@ -458,11 +529,11 @@ function setDebug(text) {
    STATUS OVERLAY AUS
    ========================================================= */
 
-
 function hideStatusOverlay() {
 
   statusOverlay.className =
     "";
+
 
   statusOverlay.style.display =
     "none";
@@ -480,9 +551,7 @@ function hideStatusOverlay() {
 
 /* =========================================================
    GELB
-   DISPONENT IM NOTRUFGESPRÄCH
    ========================================================= */
-
 
 function showCallStatus() {
 
@@ -499,16 +568,14 @@ function showCallStatus() {
 
 
   statusSubtitle.innerHTML =
-    "Bitte nicht eintreten";
+    "BITTE NICHT EINTRETEN";
 }
 
 
 
 /* =========================================================
    ROT
-   DISPONENT BESETZT
    ========================================================= */
-
 
 function showBusyStatus() {
 
@@ -531,15 +598,69 @@ function showBusyStatus() {
 
 
 /* =========================================================
-   BAZ STATUS AUSWERTEN
+   OPTIONALER UI TEST
    ========================================================= */
 
+function applyUiTestMode() {
+
+  if (
+    uiTestMode === "call"
+  ) {
+
+    showCallStatus();
+
+    return true;
+  }
+
+
+  if (
+    uiTestMode === "busy"
+  ) {
+
+    showBusyStatus();
+
+    return true;
+  }
+
+
+  if (
+    uiTestMode === "normal"
+  ) {
+
+    hideStatusOverlay();
+
+    return true;
+  }
+
+
+  return false;
+}
+
+
+
+/* =========================================================
+   ELKOS STATUS AUSWERTEN
+   ========================================================= */
 
 function applyBazStatus(data) {
 
 
   /*
-   * ELKOS Schalter aus Apps Script übernehmen
+   * UI-Test hat Vorrang.
+   *
+   * Dabei wird NUR die Darstellung getestet.
+   */
+
+  if (
+    applyUiTestMode()
+  ) {
+
+    return;
+  }
+
+
+  /*
+   * Apps-Script-Schalter übernehmen
    */
 
   elkosEnabled =
@@ -552,17 +673,16 @@ function applyBazStatus(data) {
   currentBazStatus =
     data &&
     data.bazStatus
-      ? String(data.bazStatus)
+      ? String(
+          data.bazStatus
+        )
       : "UNKNOWN";
 
 
   /*
-   * GANZ WICHTIG:
+   * ELKOS AUS
    *
-   * ELKOS deaktiviert
-   *
-   * -> normale Anzeige
-   * -> absolut keine Änderung am Türschild
+   * normales Türschild
    */
 
   if (!elkosEnabled) {
@@ -576,22 +696,21 @@ function applyBazStatus(data) {
 
 
   /*
-   * ELKOS aktiv
-   *
-   * schnellen Timer aktivieren
+   * ELKOS EIN
    */
 
   startFastElkosPolling();
 
 
   /*
-   * PRIORITÄT
+   * CALL
+   *
+   * BESCHAEFTIGT
    */
 
-
   if (
-    currentBazStatus ===
-    "CALL"
+    currentBazStatus === "CALL" &&
+    data.bazStatusOk === true
   ) {
 
     showCallStatus();
@@ -600,9 +719,15 @@ function applyBazStatus(data) {
   }
 
 
+  /*
+   * BUSY
+   *
+   * PAUSE und niemand verfügbar
+   */
+
   if (
-    currentBazStatus ===
-    "BUSY"
+    currentBazStatus === "BUSY" &&
+    data.bazStatusOk === true
   ) {
 
     showBusyStatus();
@@ -613,11 +738,12 @@ function applyBazStatus(data) {
 
   /*
    * NORMAL
-   * UNKNOWN
    * OFFLINE
+   * UNKNOWN
    * DISABLED
+   * Fehler
    *
-   * niemals falschen Warnstatus anzeigen
+   * -> normales Disponentenbild
    */
 
   hideStatusOverlay();
@@ -626,14 +752,12 @@ function applyBazStatus(data) {
 
 
 /* =========================================================
-   APPS SCRIPT DATEN HOLEN
+   META ÜBER JSONP HOLEN
    ========================================================= */
-
 
 function requestMeta(
   callbackFunction
 ) {
-
 
   var cb =
     "cb_" +
@@ -649,7 +773,8 @@ function requestMeta(
     false;
 
 
-  var script;
+  var script =
+    null;
 
 
   window[cb] =
@@ -661,7 +786,7 @@ function requestMeta(
 
 
       /*
-       * Daten gültig
+       * Gültige Antwort
        */
 
       if (
@@ -683,8 +808,7 @@ function requestMeta(
 
 
         /*
-         * Bild nur dann neu laden,
-         * wenn sich URL wirklich geändert hat.
+         * Disponentenbild
          */
 
         if (
@@ -712,8 +836,7 @@ function requestMeta(
 
 
         /*
-         * NEU:
-         * ELKOS Status behandeln
+         * ELKOS
          */
 
         applyBazStatus(
@@ -749,7 +872,6 @@ function requestMeta(
 
                   (ap.verfuegbarkeit || "?")
                 );
-
               }
             )
             .join("<br>");
@@ -757,22 +879,29 @@ function requestMeta(
 
           setDebug(
 
-            "Türschild OK" +
+            "<b>BAZ Türschild</b>" +
 
-            "<br>Disponent: " +
+            "<br><br>Disponent: " +
             (
               data.name ||
               "-"
             ) +
 
             "<br>ELKOS aktiviert: " +
-            elkosEnabled +
+            String(
+              data.bazStatusEnabled
+            ) +
 
             "<br>BAZ Status: " +
-            currentBazStatus +
+            (
+              data.bazStatus ||
+              "-"
+            ) +
 
             "<br>BAZ Status OK: " +
-            data.bazStatusOk +
+            String(
+              data.bazStatusOk
+            ) +
 
             "<br>BAZ Meldung: " +
             (
@@ -780,7 +909,13 @@ function requestMeta(
               "-"
             ) +
 
-            "<br><br>St. Pölten Arbeitsplätze:<br>" +
+            "<br>UI Test: " +
+            (
+              uiTestMode ||
+              "aus"
+            ) +
+
+            "<br><br><b>Arbeitsplätze St. Pölten</b><br>" +
 
             (
               apText ||
@@ -792,21 +927,24 @@ function requestMeta(
 
       } else {
 
-
         checkFallback();
       }
 
 
       /*
-       * Aufräumen
+       * Callback entfernen
        */
 
       try {
 
         delete window[cb];
 
-      } catch(e) {}
+      } catch (e) {}
 
+
+      /*
+       * Script entfernen
+       */
 
       if (
         script &&
@@ -849,7 +987,7 @@ function requestMeta(
     "?meta=1" +
 
     "&callback=" +
-    cb +
+    encodeURIComponent(cb) +
 
     "&t=" +
     Date.now();
@@ -887,6 +1025,16 @@ function requestMeta(
       }
 
 
+      try {
+
+        if (!responded) {
+
+          delete window[cb];
+        }
+
+      } catch (e) {}
+
+
     },
     8000
   );
@@ -897,7 +1045,6 @@ function requestMeta(
 /* =========================================================
    NORMALES UPDATE
    ========================================================= */
-
 
 function update() {
 
@@ -920,7 +1067,6 @@ function update() {
 /* =========================================================
    SCHNELLES ELKOS UPDATE
    ========================================================= */
-
 
 function elkosUpdate() {
 
@@ -947,16 +1093,14 @@ function elkosUpdate() {
 
 
 /* =========================================================
-   SCHNELLEN ELKOS TIMER STARTEN
+   ELKOS TIMER START
    ========================================================= */
-
 
 function startFastElkosPolling() {
 
 
   if (
-    elkosTimer !==
-    null
+    elkosTimer !== null
   ) {
 
     return;
@@ -975,16 +1119,14 @@ function startFastElkosPolling() {
 
 
 /* =========================================================
-   SCHNELLEN ELKOS TIMER STOPPEN
+   ELKOS TIMER STOP
    ========================================================= */
-
 
 function stopFastElkosPolling() {
 
 
   if (
-    elkosTimer ===
-    null
+    elkosTimer === null
   ) {
 
     return;
@@ -1003,9 +1145,8 @@ function stopFastElkosPolling() {
 
 
 /* =========================================================
-   FALLBACK PRÜFEN
+   LOKALER FALLBACK
    ========================================================= */
-
 
 function checkFallback() {
 
@@ -1017,8 +1158,7 @@ function checkFallback() {
 
   if (
     !currentUrl ||
-    diff >
-      10000
+    diff > 10000
   ) {
 
 
@@ -1033,9 +1173,8 @@ function checkFallback() {
 
 
 /* =========================================================
-   BILD FEHLER
+   BILDFEHLER
    ========================================================= */
-
 
 img.onerror =
   function() {
@@ -1051,9 +1190,8 @@ img.onerror =
 
 
 /* =========================================================
-   GLOBALER FFSTP FALLBACK
+   GLOBALER FALLBACK
    ========================================================= */
-
 
 async function checkGlobalFallbackStatus() {
 
@@ -1129,12 +1267,18 @@ async function checkGlobalFallbackStatus() {
   } catch (err) {
 
 
-    if (debugMode) {
+    /*
+     * Wenn nur die globale Statusdatei
+     * gerade nicht erreichbar ist,
+     * zerstören wir das Türschild nicht.
+     */
 
+
+    if (debugMode) {
 
       setDebug(
 
-        "Globaler Status Fehler:<br>" +
+        "Globaler Status konnte nicht geprüft werden:<br>" +
 
         String(err)
       );
@@ -1153,42 +1297,8 @@ async function checkGlobalFallbackStatus() {
 
 
 /* =========================================================
-   URL PARAMETER
+   BESTEHENDER OFFLINE-TEST
    ========================================================= */
-
-
-var params =
-  new URLSearchParams(
-    window.location.search
-  );
-
-
-
-/* =========================================================
-   DEBUG MODUS
-   ========================================================= */
-
-
-if (
-  params.has("debug") ||
-  params.get("debug") === "1"
-) {
-
-
-  debugMode =
-    true;
-
-
-  debugPanel.style.display =
-    "block";
-}
-
-
-
-/* =========================================================
-   OFFLINE TEST
-   ========================================================= */
-
 
 if (
 
@@ -1200,8 +1310,7 @@ if (
 
   ||
 
-  params.get("test") ===
-    "offline"
+  params.get("test") === "offline"
 
 ) {
 
@@ -1219,12 +1328,27 @@ if (
    START
    ========================================================= */
 
-
 hideStatusOverlay();
 
 
+/*
+ * Falls UI Test aktiv:
+ * sofort anzeigen.
+ */
+
+applyUiTestMode();
+
+
+/*
+ * normales Türschild laden
+ */
+
 update();
 
+
+/*
+ * globalen Status prüfen
+ */
 
 checkGlobalFallbackStatus();
 
@@ -1236,9 +1360,9 @@ checkGlobalFallbackStatus();
 
 
 /*
- * Normaler Türschild-Check
+ * normales Türschild
  *
- * bleibt 30 Sekunden wie bisher.
+ * 30 Sekunden wie bisher
  */
 
 setInterval(
@@ -1250,9 +1374,9 @@ setInterval(
 
 
 /*
- * Globaler Fallback
+ * globaler Fallback
  *
- * wie bisher alle 10 Sekunden.
+ * 10 Sekunden wie bisher
  */
 
 setInterval(
