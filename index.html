@@ -342,6 +342,16 @@ var ELKOS_UPDATE_INTERVAL =
   5000;
 
 
+/*
+ * Verbindungsausfall:
+ * Erst nach 5 Minuten ohne gültige
+ * ELKOS-/Backend-Daten wird der Fallback angezeigt.
+ */
+
+var CONNECTION_FALLBACK_MS =
+  5 * 60 * 1000;
+
+
 
 /* =========================================================
    ELEMENTE
@@ -382,6 +392,32 @@ var currentUrl =
 
 var lastSuccess =
   Date.now();
+
+
+/*
+ * Letzte gültige ELKOS-Antwort.
+ */
+
+var lastElkosSuccess =
+  Date.now();
+
+
+/*
+ * Letzter bekannter Disponent.
+ * Zusätzlich im Browser gespeichert,
+ * damit der Name auch nach einem Reload
+ * noch zur Verfügung steht.
+ */
+
+var lastKnownDisponentName =
+  "";
+
+try {
+  lastKnownDisponentName =
+    localStorage.getItem(
+      "bazLastKnownDisponentName"
+    ) || "";
+} catch (e) {}
 
 
 var globalFallbackActive =
@@ -480,6 +516,25 @@ if (
    ========================================================= */
 
 function showFallback() {
+
+  var meldungText =
+    document.getElementById(
+      "meldungText"
+    );
+
+  var nameText =
+    lastKnownDisponentName
+      ? lastKnownDisponentName
+      : "derzeit nicht verfügbar";
+
+  meldungText.innerHTML =
+    "Derzeit gibt es Verbindungsschwierigkeiten.<br>" +
+    "Der ELKOS-Status kann momentan nicht aktualisiert werden.<br><br>" +
+    "<strong>Diensthabender Disponent:</strong><br>" +
+    "<span style='font-size:1.4em;font-weight:700;'>" +
+    nameText +
+    "</span><br><br>" +
+    "Bitte läuten Sie einfach an.";
 
   meldung.style.display =
     "flex";
@@ -675,7 +730,7 @@ function applyBazStatus(data) {
     data.bazStatus
       ? String(
           data.bazStatus
-        )
+        ).toUpperCase()
       : "UNKNOWN";
 
 
@@ -683,9 +738,18 @@ function applyBazStatus(data) {
    * ELKOS AUS
    *
    * normales Türschild
+   * keine Ausfallüberwachung
    */
 
   if (!elkosEnabled) {
+
+    lastElkosSuccess =
+      Date.now();
+
+    localFallbackActive =
+      false;
+
+    hideFallback();
 
     hideStatusOverlay();
 
@@ -700,6 +764,50 @@ function applyBazStatus(data) {
    */
 
   startFastElkosPolling();
+
+
+  /*
+   * Gültiger ELKOS-Status.
+   *
+   * NORMAL / CALL / BUSY / OFFLINE
+   * gelten als erfolgreiche Statusantwort.
+   */
+
+  if (
+    data.bazStatusOk === true &&
+    currentBazStatus !== "UNKNOWN"
+  ) {
+
+    lastElkosSuccess =
+      Date.now();
+
+    localFallbackActive =
+      false;
+
+    hideFallback();
+
+  } else {
+
+    /*
+     * ELKOS liefert derzeit keine gültigen Daten.
+     * Erst nach 5 Minuten wird der Fallback gezeigt.
+     */
+
+    checkFallback();
+
+    /*
+     * Solange die 5 Minuten noch nicht erreicht sind,
+     * bleibt das zuletzt angezeigte Türschild bestehen.
+     */
+
+    if (
+      Date.now() - lastElkosSuccess <
+      CONNECTION_FALLBACK_MS
+    ) {
+
+      return;
+    }
+  }
 
 
   /*
@@ -739,14 +847,17 @@ function applyBazStatus(data) {
   /*
    * NORMAL
    * OFFLINE
-   * UNKNOWN
-   * DISABLED
-   * Fehler
    *
    * -> normales Disponentenbild
    */
 
-  hideStatusOverlay();
+  if (
+    currentBazStatus === "NORMAL" ||
+    currentBazStatus === "OFFLINE"
+  ) {
+
+    hideStatusOverlay();
+  }
 }
 
 
@@ -800,11 +911,26 @@ function requestMeta(
           Date.now();
 
 
-        localFallbackActive =
-          false;
+        /*
+         * Letzten bekannten Disponenten merken.
+         */
 
+        if (
+          data.name
+        ) {
 
-        hideFallback();
+          lastKnownDisponentName =
+            String(
+              data.name
+            );
+
+          try {
+            localStorage.setItem(
+              "bazLastKnownDisponentName",
+              lastKnownDisponentName
+            );
+          } catch (e) {}
+        }
 
 
         /*
@@ -1151,23 +1277,64 @@ function stopFastElkosPolling() {
 function checkFallback() {
 
 
-  var diff =
-    Date.now() -
+  var now =
+    Date.now();
+
+
+  var backendDiff =
+    now -
     lastSuccess;
 
 
-  if (
-    !currentUrl ||
-    diff > 10000
-  ) {
+  var elkosDiff =
+    now -
+    lastElkosSuccess;
 
+
+  /*
+   * Backend selbst länger als 5 Minuten
+   * ohne gültige Antwort.
+   */
+
+  var backendLost =
+    backendDiff >=
+    CONNECTION_FALLBACK_MS;
+
+
+  /*
+   * ELKOS ist aktiviert, liefert aber
+   * länger als 5 Minuten keine gültigen Daten.
+   */
+
+  var elkosLost =
+    elkosEnabled &&
+    elkosDiff >=
+      CONNECTION_FALLBACK_MS;
+
+
+  if (
+    backendLost ||
+    elkosLost
+  ) {
 
     localFallbackActive =
       true;
 
-
     showFallback();
+
+    return;
   }
+
+
+  /*
+   * Noch innerhalb der 5-Minuten-Toleranz:
+   * keine Verbindungsausfallanzeige.
+   */
+
+  localFallbackActive =
+    false;
+
+  hideFallback();
 }
 
 
@@ -1179,12 +1346,13 @@ function checkFallback() {
 img.onerror =
   function() {
 
+    /*
+     * Ein einzelner Bildfehler löst nicht sofort
+     * den Verbindungsausfall aus.
+     * Die normale 5-Minuten-Überwachung entscheidet.
+     */
 
-    localFallbackActive =
-      true;
-
-
-    showFallback();
+    checkFallback();
   };
 
 
