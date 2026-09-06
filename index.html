@@ -1553,7 +1553,217 @@ setInterval(
 
   10000
 );
+/* =========================================================
+   ELKOS 30-MINUTEN-SICHERHEITSFALLBACK
+   CALL/BUSY -> nach 30 Minuten normales Disponentenbild
+   ========================================================= */
 
+(function() {
+
+  var ELKOS_STUCK_30_MIN =
+    30 * 60 * 1000;
+
+
+  /*
+   * Bestehende Funktion sichern
+   */
+  var originalApplyBazStatus30 =
+    applyBazStatus;
+
+
+  /*
+   * Prüft, ob BESCHAEFTIGT bzw. PAUSE
+   * seit mindestens 30 Minuten unverändert ist.
+   */
+  function elkosStatusHaengt30Minuten(
+    data,
+    status
+  ) {
+
+    if (
+      !data ||
+      !Array.isArray(
+        data.bazArbeitsplaetze
+      )
+    ) {
+
+      return false;
+    }
+
+
+    var elkosRawStatus = "";
+
+    if (
+      status === "CALL"
+    ) {
+
+      elkosRawStatus =
+        "BESCHAEFTIGT";
+
+    } else if (
+      status === "BUSY"
+    ) {
+
+      elkosRawStatus =
+        "PAUSE";
+
+    } else {
+
+      return false;
+    }
+
+
+    var zeiten =
+      data.bazArbeitsplaetze
+
+        .filter(
+          function(ap) {
+
+            return String(
+              ap.verfuegbarkeit ||
+              ""
+            ).toUpperCase() ===
+              elkosRawStatus;
+          }
+        )
+
+        .map(
+          function(ap) {
+
+            return Date.parse(
+              ap.letzteAenderung ||
+              ""
+            );
+          }
+        )
+
+        .filter(
+          function(ts) {
+
+            return Number.isFinite(
+              ts
+            );
+          }
+        );
+
+
+    /*
+     * Kein verwertbarer Zeitstempel:
+     * nichts verändern.
+     */
+    if (
+      zeiten.length === 0
+    ) {
+
+      return false;
+    }
+
+
+    /*
+     * Bei mehreren betroffenen Arbeitsplätzen
+     * zählt die jüngste Statusänderung.
+     */
+    var letzteAenderung =
+      Math.max.apply(
+        null,
+        zeiten
+      );
+
+
+    return (
+      Date.now() -
+      letzteAenderung
+    ) >=
+      ELKOS_STUCK_30_MIN;
+  }
+
+
+  /*
+   * Bestehende ELKOS-Auswertung erweitern
+   */
+  applyBazStatus =
+    function(data) {
+
+      /*
+       * Zuerst alles wie bisher ausführen.
+       *
+       * Dadurch bleiben:
+       * - ELKOS EIN/AUS
+       * - 5-Sekunden-Polling
+       * - CALL
+       * - BUSY
+       * - normale Anzeige
+       * vollständig erhalten.
+       */
+      originalApplyBazStatus30(
+        data
+      );
+
+
+      if (
+        !data ||
+        data.bazStatusOk !== true
+      ) {
+
+        return;
+      }
+
+
+      var status =
+        String(
+          data.bazStatus ||
+          ""
+        ).toUpperCase();
+
+
+      /*
+       * Nur CALL und BUSY überwachen.
+       */
+      if (
+        status !== "CALL" &&
+        status !== "BUSY"
+      ) {
+
+        return;
+      }
+
+
+      /*
+       * Seit 30 Minuten unverändert?
+       */
+      if (
+        !elkosStatusHaengt30Minuten(
+          data,
+          status
+        )
+      ) {
+
+        return;
+      }
+
+
+      /*
+       * Sicherheitsfallback:
+       * Statusanzeige weg ->
+       * normales Disponentenbild bleibt sichtbar.
+       */
+      hideStatusOverlay();
+
+
+      console.log(
+        "⚠️ ELKOS " +
+        status +
+        " seit mindestens 30 Minuten unverändert – " +
+        "Türschild zeigt wieder den normalen Disponenten."
+      );
+    };
+
+
+  console.log(
+    "✅ ELKOS 30-Minuten-Sicherheitsfallback geladen."
+  );
+
+})();
 
 </script>
 
