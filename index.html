@@ -438,7 +438,11 @@ var currentBazStatus =
 
 var elkosTimer =
   null;
-
+/*
+ * Verhindert überlappende JSONP-Abfragen.
+ */
+var metaRequestRunning =
+  false;
 
 var debugMode =
   false;
@@ -870,6 +874,24 @@ function requestMeta(
   callbackFunction
 ) {
 
+  /*
+   * Verhindert überlappende JSONP-Abfragen.
+   *
+   * Solange eine META-/ELKOS-Abfrage noch läuft,
+   * wird keine zweite parallel gestartet.
+   */
+  if (
+    metaRequestRunning
+  ) {
+
+    return;
+  }
+
+
+  metaRequestRunning =
+    true;
+
+
   var cb =
     "cb_" +
     Date.now() +
@@ -890,6 +912,14 @@ function requestMeta(
 
   window[cb] =
     function(data) {
+
+
+      /*
+       * Request ist erfolgreich zurückgekommen.
+       * Sperre sofort wieder freigeben.
+       */
+      metaRequestRunning =
+        false;
 
 
       responded =
@@ -1135,6 +1165,16 @@ function requestMeta(
 
       if (!responded) {
 
+        /*
+         * Request hat innerhalb von 8 Sekunden
+         * nicht geantwortet.
+         *
+         * Sperre wieder freigeben, damit der
+         * nächste Poll normal starten kann.
+         */
+        metaRequestRunning =
+          false;
+
         checkFallback();
       }
 
@@ -1363,24 +1403,17 @@ img.onerror =
 
 async function checkGlobalFallbackStatus() {
 
-
   var url =
-
     GLOBAL_STATUS_URL +
-
     "?nocache=" +
-
     Date.now();
 
 
   try {
 
-
     var response =
       await fetch(
-
         url,
-
         {
           cache:
             "no-store"
@@ -1388,31 +1421,68 @@ async function checkGlobalFallbackStatus() {
       );
 
 
+    if (!response.ok) {
+
+      throw new Error(
+        "HTTP " +
+        response.status
+      );
+    }
+
+
     var text =
       await response.text();
 
 
-    var lower =
-      text.toLowerCase();
-
-
     var fallbackIsTrue =
+      false;
 
-      lower.includes(
-        "fallback"
-      )
 
-      &&
+    /*
+     * Statusdatei sauber als JSON auswerten.
+     *
+     * WICHTIG:
+     * Nur data.fallback === true aktiviert
+     * den globalen Fallback.
+     *
+     * Ein anderes "true" in der Datei
+     * darf den Fallback NICHT auslösen.
+     */
+    try {
 
-      lower.includes(
-        "true"
-      );
+      var data =
+        JSON.parse(
+          text
+        );
+
+
+      fallbackIsTrue =
+        !!(
+          data &&
+          data.fallback === true
+        );
+
+    } catch (jsonErr) {
+
+      /*
+       * Falls die Datei wider Erwarten
+       * kein gültiges JSON ist:
+       *
+       * Nur explizit
+       * "fallback": true
+       * akzeptieren.
+       */
+      fallbackIsTrue =
+        /["']?fallback["']?\s*:\s*true/i
+          .test(
+            text
+          );
+    }
 
 
     if (
       fallbackIsTrue
     ) {
-
 
       globalFallbackActive =
         true;
@@ -1420,43 +1490,40 @@ async function checkGlobalFallbackStatus() {
 
       showFallback();
 
-
     } else {
-
 
       globalFallbackActive =
         false;
 
 
+      /*
+       * hideFallback() prüft selbst,
+       * ob eventuell der lokale
+       * 5-Minuten-Fallback aktiv ist.
+       */
       hideFallback();
     }
 
 
   } catch (err) {
 
-
     /*
-     * Wenn nur die globale Statusdatei
-     * gerade nicht erreichbar ist,
-     * zerstören wir das Türschild nicht.
+     * Nur weil die globale Statusdatei
+     * kurz nicht erreichbar ist,
+     * wird KEIN Fallback eingeblendet.
      */
-
 
     if (debugMode) {
 
       setDebug(
-
         "Globaler Status konnte nicht geprüft werden:<br>" +
-
         String(err)
       );
     }
 
 
     console.log(
-
       "Globaler Status konnte nicht geprüft werden:",
-
       err
     );
   }
