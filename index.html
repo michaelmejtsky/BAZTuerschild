@@ -1765,6 +1765,212 @@ setInterval(
 
 })();
 
+  /* =========================================================
+   TÜRSCHILD FALLBACK-DIAGNOSE
+   Unterscheidet:
+   - Apps Script / Backend
+   - ELKOS Status
+   - globaler Fallback
+   ========================================================= */
+
+(function() {
+
+  var originalShowFallbackDiagnosis =
+    showFallback;
+
+  var lastFallbackReason =
+    "";
+
+
+  function getFallbackReason() {
+
+    var now =
+      Date.now();
+
+
+    /*
+     * 1. Globaler Fallback
+     */
+    if (
+      globalFallbackActive === true
+    ) {
+
+      return "GLOBAL";
+    }
+
+
+    /*
+     * 2. Apps Script / Backend
+     */
+    var backendDiff =
+      now -
+      lastSuccess;
+
+    if (
+      backendDiff >=
+      CONNECTION_FALLBACK_MS
+    ) {
+
+      return "BACKEND";
+    }
+
+
+    /*
+     * 3. ELKOS Status
+     */
+    var elkosDiff =
+      now -
+      lastElkosSuccess;
+
+    if (
+      elkosEnabled === true &&
+      elkosDiff >=
+        CONNECTION_FALLBACK_MS
+    ) {
+
+      return "ELKOS";
+    }
+
+
+    return "UNBEKANNT";
+  }
+
+
+  showFallback =
+    function() {
+
+      /*
+       * Bestehende Anzeige zuerst ausführen.
+       */
+      originalShowFallbackDiagnosis();
+
+
+      var grund =
+        getFallbackReason();
+
+
+      var meldungText =
+        document.getElementById(
+          "meldungText"
+        );
+
+
+      var nameText =
+        lastKnownDisponentName
+          ? lastKnownDisponentName
+          : "derzeit nicht verfügbar";
+
+
+      /*
+       * Apps Script / Backend
+       */
+      if (
+        grund === "BACKEND"
+      ) {
+
+        meldungText.innerHTML =
+          "Derzeit gibt es Verbindungsschwierigkeiten.<br>" +
+          "Die Verbindung zum Türschild-Server ist derzeit unterbrochen.<br><br>" +
+          "<strong>Diensthabender Disponent:</strong><br>" +
+          "<span style='font-size:1.4em;font-weight:700;'>" +
+          nameText +
+          "</span><br><br>" +
+          "Bitte läuten Sie einfach an.";
+      }
+
+
+      /*
+       * ELKOS selbst
+       */
+      else if (
+        grund === "ELKOS"
+      ) {
+
+        meldungText.innerHTML =
+          "Derzeit gibt es Verbindungsschwierigkeiten.<br>" +
+          "Der ELKOS-Status kann momentan nicht aktualisiert werden.<br><br>" +
+          "<strong>Diensthabender Disponent:</strong><br>" +
+          "<span style='font-size:1.4em;font-weight:700;'>" +
+          nameText +
+          "</span><br><br>" +
+          "Bitte läuten Sie einfach an.";
+      }
+
+
+      /*
+       * Globaler Fallback
+       */
+      else if (
+        grund === "GLOBAL"
+      ) {
+
+        meldungText.innerHTML =
+          "Das digitale Türschild befindet sich derzeit im Fallback-Modus.<br><br>" +
+          "<strong>Diensthabender Disponent:</strong><br>" +
+          "<span style='font-size:1.4em;font-weight:700;'>" +
+          nameText +
+          "</span><br><br>" +
+          "Bitte läuten Sie einfach an.";
+      }
+
+
+      /*
+       * Diagnose nur einmal bei Änderung loggen.
+       */
+      if (
+        grund !==
+        lastFallbackReason
+      ) {
+
+        lastFallbackReason =
+          grund;
+
+
+        console.log(
+          "⚠️ TÜRSCHILD FALLBACK:",
+          grund
+        );
+
+
+        console.log(
+          "Backend letzte Antwort vor:",
+          Math.round(
+            (
+              Date.now() -
+              lastSuccess
+            ) /
+            1000
+          ),
+          "Sekunden"
+        );
+
+
+        console.log(
+          "ELKOS letzte gültige Antwort vor:",
+          Math.round(
+            (
+              Date.now() -
+              lastElkosSuccess
+            ) /
+            1000
+          ),
+          "Sekunden"
+        );
+
+
+        console.log(
+          "Globaler Fallback:",
+          globalFallbackActive
+        );
+      }
+    };
+
+
+  console.log(
+    "✅ Türschild-Fallback-Diagnose geladen."
+  );
+
+})();
 </script>
 
 </body>
