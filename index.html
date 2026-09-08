@@ -424,6 +424,14 @@ var globalFallbackActive =
   false;
 
 
+/*
+ * Globaler Fallback muss zweimal hintereinander
+ * TRUE melden, bevor die Meldung angezeigt wird.
+ */
+var globalFallbackTrueCount =
+  0;
+
+
 var localFallbackActive =
   false;
 
@@ -1440,13 +1448,7 @@ async function checkGlobalFallbackStatus() {
 
     /*
      * Statusdatei sauber als JSON auswerten.
-     *
-     * WICHTIG:
-     * Nur data.fallback === true aktiviert
-     * den globalen Fallback.
-     *
-     * Ein anderes "true" in der Datei
-     * darf den Fallback NICHT auslösen.
+     * Nur data.fallback === true zählt.
      */
     try {
 
@@ -1466,11 +1468,8 @@ async function checkGlobalFallbackStatus() {
 
       /*
        * Falls die Datei wider Erwarten
-       * kein gültiges JSON ist:
-       *
-       * Nur explizit
-       * "fallback": true
-       * akzeptieren.
+       * kein gültiges JSON ist, nur ein
+       * explizites fallback:true akzeptieren.
        */
       fallbackIsTrue =
         /["']?fallback["']?\s*:\s*true/i
@@ -1480,27 +1479,43 @@ async function checkGlobalFallbackStatus() {
     }
 
 
+    /*
+     * Erst nach ZWEI aufeinanderfolgenden TRUE-Antworten
+     * wird der globale Fallback wirklich eingeblendet.
+     * Damit kann ein einzelner Cache-/Netzwerk-Ausreißer
+     * nicht mehr kurz das schwarze Fallback-Bild zeigen.
+     */
     if (
       fallbackIsTrue
     ) {
 
-      globalFallbackActive =
-        true;
+      globalFallbackTrueCount++;
 
 
-      showFallback();
+      if (
+        globalFallbackTrueCount >= 2
+      ) {
+
+        globalFallbackActive =
+          true;
+
+
+        showFallback();
+      }
 
     } else {
+
+      /*
+       * Ein gültiges FALSE setzt sofort zurück.
+       */
+      globalFallbackTrueCount =
+        0;
+
 
       globalFallbackActive =
         false;
 
 
-      /*
-       * hideFallback() prüft selbst,
-       * ob eventuell der lokale
-       * 5-Minuten-Fallback aktiv ist.
-       */
       hideFallback();
     }
 
@@ -1509,8 +1524,8 @@ async function checkGlobalFallbackStatus() {
 
     /*
      * Nur weil die globale Statusdatei
-     * kurz nicht erreichbar ist,
-     * wird KEIN Fallback eingeblendet.
+     * kurz nicht erreichbar ist, wird
+     * KEIN Fallback eingeblendet.
      */
 
     if (debugMode) {
