@@ -339,7 +339,21 @@ var NORMAL_UPDATE_INTERVAL =
  */
 
 var ELKOS_UPDATE_INTERVAL =
-  5000;
+  3000;
+
+
+/*
+ * Timeout für den schnellen ELKOS-Endpunkt.
+ */
+var ELKOS_REQUEST_TIMEOUT =
+  4500;
+
+
+/*
+ * Bild-/Namens-META darf etwas länger brauchen.
+ */
+var META_REQUEST_TIMEOUT =
+  8000;
 
 
 /*
@@ -447,10 +461,23 @@ var currentBazStatus =
 var elkosTimer =
   null;
 /*
- * Verhindert überlappende JSONP-Abfragen.
+ * Bild-/Namens-META separat.
  */
 var metaRequestRunning =
   false;
+
+
+/*
+ * ELKOS läuft getrennt vom Bild-/META-Request.
+ * Eine verspätete alte Antwort darf einen neueren Status
+ * nicht mehr überschreiben.
+ */
+var elkosRequestSeq =
+  0;
+
+
+var lastAppliedElkosSeq =
+  0;
 
 var debugMode =
   false;
@@ -765,17 +792,16 @@ function applyBazStatus(data) {
 
     hideStatusOverlay();
 
-    stopFastElkosPolling();
-
     return;
   }
 
 
   /*
    * ELKOS EIN
+   *
+   * Der schnelle ELKOS-Timer läuft unabhängig vom
+   * Bild-/META-Update.
    */
-
-  startFastElkosPolling();
 
 
   /*
@@ -883,10 +909,7 @@ function requestMeta(
 ) {
 
   /*
-   * Verhindert überlappende JSONP-Abfragen.
-   *
-   * Solange eine META-/ELKOS-Abfrage noch läuft,
-   * wird keine zweite parallel gestartet.
+   * Bild und Name werden ohne ELKOS geladen.
    */
   if (
     metaRequestRunning
@@ -901,7 +924,7 @@ function requestMeta(
 
 
   var cb =
-    "cb_" +
+    "meta_cb_" +
     Date.now() +
     "_" +
     Math.floor(
@@ -921,22 +944,12 @@ function requestMeta(
   window[cb] =
     function(data) {
 
-
-      /*
-       * Request ist erfolgreich zurückgekommen.
-       * Sperre sofort wieder freigeben.
-       */
       metaRequestRunning =
         false;
-
 
       responded =
         true;
 
-
-      /*
-       * Gültige Antwort
-       */
 
       if (
         data &&
@@ -944,14 +957,9 @@ function requestMeta(
         data.url
       ) {
 
-
         lastSuccess =
           Date.now();
 
-
-        /*
-         * Letzten bekannten Disponenten merken.
-         */
 
         if (
           data.name
@@ -963,23 +971,20 @@ function requestMeta(
             );
 
           try {
+
             localStorage.setItem(
               "bazLastKnownDisponentName",
               lastKnownDisponentName
             );
+
           } catch (e) {}
         }
 
-
-        /*
-         * Disponentenbild
-         */
 
         if (
           data.url !==
           currentUrl
         ) {
-
 
           currentUrl =
             data.url;
@@ -999,94 +1004,10 @@ function requestMeta(
         }
 
 
-        /*
-         * ELKOS
-         */
+        localFallbackActive =
+          false;
 
-        applyBazStatus(
-          data
-        );
-
-
-        /*
-         * DEBUG
-         */
-
-        if (debugMode) {
-
-
-          var aps =
-            data.bazArbeitsplaetze ||
-            [];
-
-
-          var apText =
-            aps.map(
-              function(ap) {
-
-                return (
-
-                  (ap.arbeitsplatzName || "?") +
-
-                  " | " +
-
-                  (ap.disponentName || "-") +
-
-                  " | " +
-
-                  (ap.verfuegbarkeit || "?")
-                );
-              }
-            )
-            .join("<br>");
-
-
-          setDebug(
-
-            "<b>BAZ Türschild</b>" +
-
-            "<br><br>Disponent: " +
-            (
-              data.name ||
-              "-"
-            ) +
-
-            "<br>ELKOS aktiviert: " +
-            String(
-              data.bazStatusEnabled
-            ) +
-
-            "<br>BAZ Status: " +
-            (
-              data.bazStatus ||
-              "-"
-            ) +
-
-            "<br>BAZ Status OK: " +
-            String(
-              data.bazStatusOk
-            ) +
-
-            "<br>BAZ Meldung: " +
-            (
-              data.bazStatusMessage ||
-              "-"
-            ) +
-
-            "<br>UI Test: " +
-            (
-              uiTestMode ||
-              "aus"
-            ) +
-
-            "<br><br><b>Arbeitsplätze St. Pölten</b><br>" +
-
-            (
-              apText ||
-              "keine Daten"
-            )
-          );
-        }
+        hideFallback();
 
 
       } else {
@@ -1095,20 +1016,12 @@ function requestMeta(
       }
 
 
-      /*
-       * Callback entfernen
-       */
-
       try {
 
         delete window[cb];
 
       } catch (e) {}
 
-
-      /*
-       * Script entfernen
-       */
 
       if (
         script &&
@@ -1134,10 +1047,6 @@ function requestMeta(
     };
 
 
-  /*
-   * JSONP Script
-   */
-
   script =
     document.createElement(
       "script"
@@ -1148,7 +1057,7 @@ function requestMeta(
 
     SCRIPT_URL +
 
-    "?meta=1" +
+    "?schildmeta=1" +
 
     "&callback=" +
     encodeURIComponent(cb) +
@@ -1163,23 +1072,11 @@ function requestMeta(
     );
 
 
-  /*
-   * Timeout
-   */
-
   setTimeout(
     function() {
 
-
       if (!responded) {
 
-        /*
-         * Request hat innerhalb von 8 Sekunden
-         * nicht geantwortet.
-         *
-         * Sperre wieder freigeben, damit der
-         * nächste Poll normal starten kann.
-         */
         metaRequestRunning =
           false;
 
@@ -1210,7 +1107,270 @@ function requestMeta(
 
 
     },
-    8000
+    META_REQUEST_TIMEOUT
+  );
+}
+
+
+
+/* =========================================================
+   SCHNELLER ELKOS STATUS – GETRENNT VOM BILD
+   ========================================================= */
+
+function requestElkosStatus() {
+
+  if (
+    globalFallbackActive
+  ) {
+
+    return;
+  }
+
+
+  var seq =
+    ++elkosRequestSeq;
+
+
+  var cb =
+    "elkos_cb_" +
+    seq +
+    "_" +
+    Date.now() +
+    "_" +
+    Math.floor(
+      Math.random() *
+      100000
+    );
+
+
+  var responded =
+    false;
+
+
+  var script =
+    null;
+
+
+  function cleanupElkosJsonp_() {
+
+    try {
+
+      delete window[cb];
+
+    } catch (e) {}
+
+
+    if (
+      script &&
+      script.parentNode
+    ) {
+
+      script.parentNode
+        .removeChild(
+          script
+        );
+    }
+  }
+
+
+  window[cb] =
+    function(data) {
+
+      responded =
+        true;
+
+
+      /*
+       * Wenn bereits eine neuere Antwort übernommen wurde,
+       * diese verspätete alte Antwort ignorieren.
+       */
+      if (
+        seq <
+        lastAppliedElkosSeq
+      ) {
+
+        cleanupElkosJsonp_();
+
+        return;
+      }
+
+
+      if (
+        data &&
+        data.ok === true
+      ) {
+
+        lastAppliedElkosSeq =
+          seq;
+
+
+        /*
+         * Nur ein gültiger ELKOS-Zustand aktualisiert
+         * die sichtbare Anzeige.
+         *
+         * UNKNOWN oder ein einzelner technischer Fehler
+         * lässt den letzten gültigen Zustand stehen.
+         */
+        if (
+          data.bazStatusOk === true &&
+          String(
+            data.bazStatus ||
+            "UNKNOWN"
+          ).toUpperCase() !==
+            "UNKNOWN"
+        ) {
+
+          lastElkosSuccess =
+            Date.now();
+
+          localFallbackActive =
+            false;
+
+          hideFallback();
+
+
+          applyBazStatus(
+            data
+          );
+
+
+        } else {
+
+          checkFallback();
+        }
+
+
+        if (debugMode) {
+
+          var aps =
+            data.bazArbeitsplaetze ||
+            [];
+
+
+          var apText =
+            aps.map(
+              function(ap) {
+
+                return (
+
+                  (ap.arbeitsplatzName || "?") +
+
+                  " | " +
+
+                  (ap.disponentName || "-") +
+
+                  " | " +
+
+                  (ap.verfuegbarkeit || "?")
+                );
+              }
+            )
+              .join("<br>");
+
+
+          setDebug(
+
+            "<b>BAZ Türschild</b>" +
+
+            "<br><br>Disponent: " +
+            (
+              lastKnownDisponentName ||
+              "-"
+            ) +
+
+            "<br>ELKOS aktiviert: " +
+            String(
+              data.bazStatusEnabled
+            ) +
+
+            "<br>BAZ Status: " +
+            (
+              data.bazStatus ||
+              "-"
+            ) +
+
+            "<br>BAZ Status OK: " +
+            String(
+              data.bazStatusOk
+            ) +
+
+            "<br>BAZ Meldung: " +
+            (
+              data.bazStatusMessage ||
+              "-"
+            ) +
+
+            "<br>ELKOS Request: " +
+            seq +
+
+            "<br>UI Test: " +
+            (
+              uiTestMode ||
+              "aus"
+            ) +
+
+            "<br><br><b>Arbeitsplätze St. Pölten</b><br>" +
+
+            (
+              apText ||
+              "keine Daten"
+            )
+          );
+        }
+
+
+      } else {
+
+        checkFallback();
+      }
+
+
+      cleanupElkosJsonp_();
+    };
+
+
+  script =
+    document.createElement(
+      "script"
+    );
+
+
+  script.src =
+
+    SCRIPT_URL +
+
+    "?elkosstatus=1" +
+
+    "&callback=" +
+    encodeURIComponent(cb) +
+
+    "&t=" +
+    Date.now();
+
+
+  document.body
+    .appendChild(
+      script
+    );
+
+
+  setTimeout(
+    function() {
+
+      if (!responded) {
+
+        /*
+         * Ein einzelner Timeout verändert die Anzeige nicht.
+         * Erst die bestehende 5-Minuten-Logik darf
+         * den Verbindungsfallback aktivieren.
+         */
+        checkFallback();
+
+        cleanupElkosJsonp_();
+      }
+
+    },
+    ELKOS_REQUEST_TIMEOUT
   );
 }
 
@@ -1246,14 +1406,6 @@ function elkosUpdate() {
 
 
   if (
-    !elkosEnabled
-  ) {
-
-    return;
-  }
-
-
-  if (
     globalFallbackActive
   ) {
 
@@ -1261,7 +1413,7 @@ function elkosUpdate() {
   }
 
 
-  requestMeta();
+  requestElkosStatus();
 }
 
 
@@ -1597,6 +1749,16 @@ update();
 
 
 /*
+ * ELKOS sofort einmal laden.
+ * Danach alle 3 Sekunden unabhängig vom Bild aktualisieren.
+ */
+
+requestElkosStatus();
+
+startFastElkosPolling();
+
+
+/*
  * globalen Status prüfen
  */
 
@@ -1771,7 +1933,7 @@ setInterval(
        *
        * Dadurch bleiben:
        * - ELKOS EIN/AUS
-       * - 5-Sekunden-Polling
+       * - 3-Sekunden-Polling
        * - CALL
        * - BUSY
        * - normale Anzeige
