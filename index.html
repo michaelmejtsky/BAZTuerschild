@@ -1243,91 +1243,193 @@ function requestMeta() {
     true;
 
 
-  makeJsonpRequest(
+  var cb =
+    "schildmeta_cb_" +
+    Date.now() +
+    "_" +
+    Math.floor(
+      Math.random() *
+      100000
+    );
 
-    SCRIPT_URL +
-      "?schildmeta=1",
 
-    "schildmeta",
+  var responded =
+    false;
 
-    FAST_REQUEST_TIMEOUT,
 
+  var script =
+    document.createElement(
+      "script"
+    );
+
+
+  function cleanupMeta() {
+
+    try {
+      delete window[cb];
+    } catch (e) {}
+
+
+    if (
+      script &&
+      script.parentNode
+    ) {
+
+      script.parentNode.removeChild(
+        script
+      );
+    }
+  }
+
+
+  window[cb] =
     function(data) {
 
-      metaRequestRunning =
-        false;
-
-
-      if (
-        !data ||
-        data.ok !== true ||
-        !data.url
-      ) {
-
-        checkFallback();
-
+      if (responded) {
         return;
       }
 
 
-      lastSuccess =
-        Date.now();
+      responded =
+        true;
 
-
-      if (
-        data.name
-      ) {
-
-        lastKnownDisponentName =
-          String(
-            data.name
-          );
-
-
-        try {
-
-          localStorage.setItem(
-            "bazLastKnownDisponentName",
-            lastKnownDisponentName
-          );
-
-        } catch (e) {}
-      }
-
-
-      if (
-        data.url !==
-        currentUrl
-      ) {
-
-        currentUrl =
-          data.url;
-
-
-        img.src =
-          currentUrl +
-
-          (
-            currentUrl.indexOf("?") >= 0
-              ? "&"
-              : "?"
-          ) +
-
-          "r=" +
-          Date.now();
-      }
-
-
-      checkFallback();
-    },
-
-    function() {
 
       metaRequestRunning =
         false;
 
+
+      if (
+        data &&
+        data.ok === true &&
+        data.url
+      ) {
+
+        lastSuccess =
+          Date.now();
+
+
+        if (data.name) {
+
+          lastKnownDisponentName =
+            String(
+              data.name
+            );
+
+          try {
+
+            localStorage.setItem(
+              "bazLastKnownDisponentName",
+              lastKnownDisponentName
+            );
+
+          } catch (e) {}
+        }
+
+
+        var neueUrl =
+          String(
+            data.url
+          );
+
+
+        /*
+         * Bild beim ersten erfolgreichen META-Aufruf
+         * IMMER setzen. Danach nur bei Änderung oder wenn
+         * das img-Element noch keine Quelle hat.
+         */
+        if (
+          neueUrl !== currentUrl ||
+          !img.getAttribute("src")
+        ) {
+
+          currentUrl =
+            neueUrl;
+
+
+          img.src =
+            currentUrl +
+            (
+              currentUrl.indexOf("?") >= 0
+                ? "&"
+                : "?"
+            ) +
+            "r=" +
+            Date.now();
+        }
+
+
+        checkFallback();
+
+      } else {
+
+        checkFallback();
+      }
+
+
+      cleanupMeta();
+    };
+
+
+  script.onerror =
+    function() {
+
+      if (responded) {
+        return;
+      }
+
+
+      responded =
+        true;
+
+
+      metaRequestRunning =
+        false;
+
+
+      cleanupMeta();
+
+
       checkFallback();
-    }
+    };
+
+
+  script.src =
+    SCRIPT_URL +
+    "?schildmeta=1" +
+    "&callback=" +
+    encodeURIComponent(cb) +
+    "&t=" +
+    Date.now();
+
+
+  document.body.appendChild(
+    script
+  );
+
+
+  setTimeout(
+    function() {
+
+      if (responded) {
+        return;
+      }
+
+
+      responded =
+        true;
+
+
+      metaRequestRunning =
+        false;
+
+
+      cleanupMeta();
+
+
+      checkFallback();
+
+    },
+    FAST_REQUEST_TIMEOUT
   );
 }
 
