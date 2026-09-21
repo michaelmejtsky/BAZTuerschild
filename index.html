@@ -299,6 +299,8 @@ body {
 
 <script>
 
+/* VERSION 2026-09-21: Backend/ELKOS-Fallback entkoppelt. */
+
 
 /* =========================================================
    KONFIGURATION
@@ -785,10 +787,7 @@ function applyBazStatus(data) {
     lastElkosSuccess =
       Date.now();
 
-    localFallbackActive =
-      false;
-
-    hideFallback();
+    checkFallback();
 
     hideStatusOverlay();
 
@@ -819,10 +818,7 @@ function applyBazStatus(data) {
     lastElkosSuccess =
       Date.now();
 
-    localFallbackActive =
-      false;
-
-    hideFallback();
+    checkFallback();
 
   } else {
 
@@ -1004,10 +1000,7 @@ function requestMeta(
         }
 
 
-        localFallbackActive =
-          false;
-
-        hideFallback();
+        checkFallback();
 
 
       } else {
@@ -1200,6 +1193,14 @@ function requestElkosStatus() {
         data.ok === true
       ) {
 
+        /*
+         * Der Apps-Script-Server hat geantwortet.
+         * Damit ist der Türschild-Server erreichbar, auch wenn
+         * ELKOS selbst gerade UNKNOWN liefern sollte.
+         */
+        lastSuccess =
+          Date.now();
+
         lastAppliedElkosSeq =
           seq;
 
@@ -1223,10 +1224,7 @@ function requestElkosStatus() {
           lastElkosSuccess =
             Date.now();
 
-          localFallbackActive =
-            false;
-
-          hideFallback();
+          checkFallback();
 
 
           applyBazStatus(
