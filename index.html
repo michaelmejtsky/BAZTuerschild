@@ -299,58 +299,70 @@ body {
 
 <script>
 
-
 /* =========================================================
    KONFIGURATION
    ========================================================= */
 
-
-/*
- * DEIN BESTEHENDES APPS SCRIPT
- */
-
 var SCRIPT_URL =
   "https://script.google.com/macros/s/AKfycbx7iycjDS2MtYA1sTFPiqHs2XV3G0JBlKUxfysi2UBZoVaKuNJGMM7gOAnFexj7Bssq/exec";
-
-
-/*
- * DEIN BESTEHENDER GLOBALER FALLBACK
- */
 
 var GLOBAL_STATUS_URL =
   "https://michaelmejtsky.github.io/FFSTP-Status/status.json";
 
 
 /*
- * Normales Türschild:
- * alle 30 Sekunden
+ * Disponentenbild / Name:
+ * alle 30 Sekunden.
  */
-
-var NORMAL_UPDATE_INTERVAL =
+var META_UPDATE_INTERVAL =
   30000;
 
 
 /*
- * Wenn ELKOS aktiv ist:
- * Status alle 5 Sekunden
- *
- * Solange ELKOS deaktiviert ist,
- * wird dieser Timer NICHT gestartet.
+ * Snapshot lesen:
+ * sehr billig, weil KEIN Live-ELKOS-Aufruf.
  */
+var ELKOS_SNAPSHOT_INTERVAL =
+  1000;
 
-var ELKOS_UPDATE_INTERVAL =
+
+/*
+ * Echten ELKOS-Liveabruf anstoßen:
+ * alle 5 Sekunden.
+ */
+var ELKOS_REFRESH_INTERVAL =
   5000;
 
 
 /*
- * Verbindungsausfall:
- * Erst nach 5 Minuten ohne gültige
- * ELKOS-/Backend-Daten wird der Fallback angezeigt.
+ * Ein hängender Live-Refresh darf die Anzeige nicht blockieren.
+ * Nach 12 Sekunden darf ein neuer Refresh versucht werden.
  */
+var ELKOS_REFRESH_TIMEOUT =
+  12000;
 
+
+/*
+ * Snapshot-/Meta-Endpunkte sollten schnell antworten.
+ */
+var FAST_REQUEST_TIMEOUT =
+  5000;
+
+
+/*
+ * Erst nach 5 Minuten ohne gültige Daten
+ * wird der lokale Fallback angezeigt.
+ */
 var CONNECTION_FALLBACK_MS =
   5 * 60 * 1000;
 
+
+/*
+ * CALL/BUSY nach 30 Minuten unverändert:
+ * normales Disponentenbild zeigen.
+ */
+var ELKOS_STUCK_30_MIN =
+  30 * 60 * 1000;
 
 
 /* =========================================================
@@ -360,26 +372,20 @@ var CONNECTION_FALLBACK_MS =
 var img =
   document.getElementById("schild");
 
-
 var meldung =
   document.getElementById("meldung");
-
 
 var statusOverlay =
   document.getElementById("statusOverlay");
 
-
 var statusTitle =
   document.getElementById("statusTitle");
-
 
 var statusSubtitle =
   document.getElementById("statusSubtitle");
 
-
 var debugPanel =
   document.getElementById("debugPanel");
-
 
 
 /* =========================================================
@@ -390,82 +396,71 @@ var currentUrl =
   "";
 
 
+/*
+ * Letzter erfolgreicher Kontakt zum Apps-Script-Backend.
+ * JEDER schnelle Snapshot-/Meta-Erfolg zählt.
+ */
 var lastSuccess =
   Date.now();
 
 
 /*
- * Letzte gültige ELKOS-Antwort.
+ * Zeitpunkt des letzten echten, gültigen ELKOS-Live-Snapshots.
+ * Wird NICHT bei jedem Lesen des gleichen Snapshots erneuert.
  */
-
 var lastElkosSuccess =
   Date.now();
 
 
-/*
- * Letzter bekannter Disponent.
- * Zusätzlich im Browser gespeichert,
- * damit der Name auch nach einem Reload
- * noch zur Verfügung steht.
- */
+var lastAppliedSnapshotTs =
+  0;
+
 
 var lastKnownDisponentName =
   "";
 
 try {
+
   lastKnownDisponentName =
     localStorage.getItem(
       "bazLastKnownDisponentName"
     ) || "";
+
 } catch (e) {}
 
 
 var globalFallbackActive =
   false;
 
-
-/*
- * Globaler Fallback muss zweimal hintereinander
- * TRUE melden, bevor die Meldung angezeigt wird.
- */
 var globalFallbackTrueCount =
   0;
-
 
 var localFallbackActive =
   false;
 
-
-var elkosEnabled =
+var offlineTestMode =
   false;
 
+var elkosEnabled =
+  true;
 
 var currentBazStatus =
-  "DISABLED";
+  "UNKNOWN";
 
-
-var elkosTimer =
-  null;
-/*
- * Verhindert überlappende JSONP-Abfragen.
- */
 var metaRequestRunning =
+  false;
+
+var snapshotRequestRunning =
+  false;
+
+var refreshRequestRunning =
   false;
 
 var debugMode =
   false;
 
-
-/*
- * Optionaler UI-Testmodus.
- *
- * Dadurch können wir Gelb/Rot testen,
- * OHNE ELKOS zu aktivieren.
- */
-
 var uiTestMode =
   "";
-
 
 
 /* =========================================================
@@ -477,12 +472,6 @@ var params =
     window.location.search
   );
 
-
-/*
- * Debug:
- *
- * ?debug=1
- */
 
 if (
   params.has("debug") ||
@@ -496,14 +485,6 @@ if (
     "block";
 }
 
-
-/*
- * UI Test:
- *
- * ?test=call
- * ?test=busy
- * ?test=normal
- */
 
 var requestedTest =
   String(
@@ -522,52 +503,18 @@ if (
 }
 
 
+if (
+  params.has("offline") ||
+  params.has("testoffline") ||
+  params.get("test") === "offline"
+) {
 
-/* =========================================================
-   FALLBACK
-   ========================================================= */
+  offlineTestMode =
+    true;
 
-function showFallback() {
-
-  var meldungText =
-    document.getElementById(
-      "meldungText"
-    );
-
-  var nameText =
-    lastKnownDisponentName
-      ? lastKnownDisponentName
-      : "derzeit nicht verfügbar";
-
-  meldungText.innerHTML =
-    "Derzeit gibt es Verbindungsschwierigkeiten.<br>" +
-    "Der ELKOS-Status kann momentan nicht aktualisiert werden.<br><br>" +
-    "<strong>Diensthabender Disponent:</strong><br>" +
-    "<span style='font-size:1.4em;font-weight:700;'>" +
-    nameText +
-    "</span><br><br>" +
-    "Bitte läuten Sie einfach an.";
-
-  meldung.style.display =
-    "flex";
+  globalFallbackActive =
+    true;
 }
-
-
-function hideFallback() {
-
-  if (
-    globalFallbackActive ||
-    localFallbackActive
-  ) {
-
-    return;
-  }
-
-
-  meldung.style.display =
-    "none";
-}
-
 
 
 /* =========================================================
@@ -585,15 +532,13 @@ function setDebug(text) {
   debugPanel.style.display =
     "block";
 
-
   debugPanel.innerHTML =
     text;
 }
 
 
-
 /* =========================================================
-   STATUS OVERLAY AUS
+   STATUS OVERLAY
    ========================================================= */
 
 function hideStatusOverlay() {
@@ -601,71 +546,51 @@ function hideStatusOverlay() {
   statusOverlay.className =
     "";
 
-
   statusOverlay.style.display =
     "none";
 
-
   statusTitle.innerHTML =
     "";
-
 
   statusSubtitle.innerHTML =
     "";
 }
 
-
-
-/* =========================================================
-   GELB
-   ========================================================= */
 
 function showCallStatus() {
 
   statusOverlay.className =
     "call";
 
-
   statusOverlay.style.display =
     "flex";
 
-
   statusTitle.innerHTML =
     "DISPONENT<br>IM NOTRUFGESPRÄCH";
-
 
   statusSubtitle.innerHTML =
     "BITTE WARTEN";
 }
 
-
-
-/* =========================================================
-   ROT
-   ========================================================= */
 
 function showBusyStatus() {
 
   statusOverlay.className =
     "busy";
 
-
   statusOverlay.style.display =
     "flex";
 
-
   statusTitle.innerHTML =
     "DISPONENT KURZ ABWESEND";
-
 
   statusSubtitle.innerHTML =
     "BITTE WARTEN";
 }
 
 
-
 /* =========================================================
-   OPTIONALER UI TEST
+   UI TEST
    ========================================================= */
 
 function applyUiTestMode() {
@@ -704,19 +629,317 @@ function applyUiTestMode() {
 }
 
 
-
 /* =========================================================
-   ELKOS STATUS AUSWERTEN
+   FALLBACK
    ========================================================= */
 
-function applyBazStatus(data) {
+function getFallbackReason() {
+
+  if (
+    globalFallbackActive === true
+  ) {
+
+    return "GLOBAL";
+  }
 
 
-  /*
-   * UI-Test hat Vorrang.
-   *
-   * Dabei wird NUR die Darstellung getestet.
-   */
+  var now =
+    Date.now();
+
+
+  if (
+    now -
+    lastSuccess >=
+      CONNECTION_FALLBACK_MS
+  ) {
+
+    return "BACKEND";
+  }
+
+
+  if (
+    elkosEnabled === true &&
+    now -
+    lastElkosSuccess >=
+      CONNECTION_FALLBACK_MS
+  ) {
+
+    return "ELKOS";
+  }
+
+
+  return "";
+}
+
+
+function showFallback(
+  reason
+) {
+
+  var meldungText =
+    document.getElementById(
+      "meldungText"
+    );
+
+
+  var nameText =
+    lastKnownDisponentName
+      ? lastKnownDisponentName
+      : "derzeit nicht verfügbar";
+
+
+  if (
+    reason === "GLOBAL"
+  ) {
+
+    meldungText.innerHTML =
+      "Das digitale Türschild befindet sich derzeit im Fallback-Modus.<br><br>" +
+      "<strong>Diensthabender Disponent:</strong><br>" +
+      "<span style='font-size:1.4em;font-weight:700;'>" +
+      nameText +
+      "</span><br><br>" +
+      "Bitte läuten Sie einfach an.";
+
+  } else if (
+    reason === "BACKEND"
+  ) {
+
+    meldungText.innerHTML =
+      "Derzeit gibt es Verbindungsschwierigkeiten.<br>" +
+      "Die Verbindung zum Türschild-Server ist derzeit unterbrochen.<br><br>" +
+      "<strong>Diensthabender Disponent:</strong><br>" +
+      "<span style='font-size:1.4em;font-weight:700;'>" +
+      nameText +
+      "</span><br><br>" +
+      "Bitte läuten Sie einfach an.";
+
+  } else {
+
+    meldungText.innerHTML =
+      "Derzeit gibt es Verbindungsschwierigkeiten.<br>" +
+      "Der ELKOS-Status kann momentan nicht aktualisiert werden.<br><br>" +
+      "<strong>Diensthabender Disponent:</strong><br>" +
+      "<span style='font-size:1.4em;font-weight:700;'>" +
+      nameText +
+      "</span><br><br>" +
+      "Bitte läuten Sie einfach an.";
+  }
+
+
+  meldung.style.display =
+    "flex";
+}
+
+
+function hideFallback() {
+
+  if (
+    globalFallbackActive ||
+    localFallbackActive
+  ) {
+
+    return;
+  }
+
+
+  meldung.style.display =
+    "none";
+}
+
+
+function checkFallback() {
+
+  var reason =
+    getFallbackReason();
+
+
+  localFallbackActive =
+    (
+      reason === "BACKEND" ||
+      reason === "ELKOS"
+    );
+
+
+  if (
+    reason
+  ) {
+
+    showFallback(
+      reason
+    );
+
+  } else {
+
+    hideFallback();
+  }
+
+
+  if (debugMode) {
+
+    setDebug(
+
+      "<b>BAZ Türschild – Snapshot-Modus</b>" +
+
+      "<br><br>Disponent: " +
+      (
+        lastKnownDisponentName ||
+        "-"
+      ) +
+
+      "<br>BAZ Status: " +
+      (
+        currentBazStatus ||
+        "-"
+      ) +
+
+      "<br>ELKOS aktiviert: " +
+      String(
+        elkosEnabled
+      ) +
+
+      "<br>Backend letzte Antwort vor: " +
+      Math.round(
+        (
+          Date.now() -
+          lastSuccess
+        ) /
+        1000
+      ) +
+      " s" +
+
+      "<br>ELKOS letzter Live-Snapshot vor: " +
+      Math.round(
+        (
+          Date.now() -
+          lastElkosSuccess
+        ) /
+        1000
+      ) +
+      " s" +
+
+      "<br>Fallback: " +
+      (
+        reason ||
+        "AUS"
+      ) +
+
+      "<br>Refresh läuft: " +
+      String(
+        refreshRequestRunning
+      )
+    );
+  }
+}
+
+
+/* =========================================================
+   30-MINUTEN-HÄNGER ERKENNEN
+   ========================================================= */
+
+function elkosStatusHaengt30Minuten(
+  data,
+  status
+) {
+
+  if (
+    !data ||
+    !Array.isArray(
+      data.bazArbeitsplaetze
+    )
+  ) {
+
+    return false;
+  }
+
+
+  var rawStatus =
+    "";
+
+
+  if (
+    status === "CALL"
+  ) {
+
+    rawStatus =
+      "BESCHAEFTIGT";
+
+  } else if (
+    status === "BUSY"
+  ) {
+
+    rawStatus =
+      "PAUSE";
+
+  } else {
+
+    return false;
+  }
+
+
+  var zeiten =
+    data.bazArbeitsplaetze
+
+      .filter(
+        function(ap) {
+
+          return String(
+            ap.verfuegbarkeit ||
+            ""
+          ).toUpperCase() ===
+            rawStatus;
+        }
+      )
+
+      .map(
+        function(ap) {
+
+          return Date.parse(
+            ap.letzteAenderung ||
+            ""
+          );
+        }
+      )
+
+      .filter(
+        function(ts) {
+
+          return Number.isFinite(
+            ts
+          );
+        }
+      );
+
+
+  if (
+    zeiten.length === 0
+  ) {
+
+    return false;
+  }
+
+
+  var letzteAenderung =
+    Math.max.apply(
+      null,
+      zeiten
+    );
+
+
+  return (
+    Date.now() -
+    letzteAenderung
+  ) >=
+    ELKOS_STUCK_30_MIN;
+}
+
+
+/* =========================================================
+   ELKOS STATUS ANZEIGEN
+   ========================================================= */
+
+function applyBazStatus(
+  data
+) {
 
   if (
     applyUiTestMode()
@@ -726,10 +949,6 @@ function applyBazStatus(data) {
   }
 
 
-  /*
-   * Apps-Script-Schalter übernehmen
-   */
-
   elkosEnabled =
     !!(
       data &&
@@ -737,100 +956,74 @@ function applyBazStatus(data) {
     );
 
 
-  currentBazStatus =
-    data &&
-    data.bazStatus
-      ? String(
-          data.bazStatus
-        ).toUpperCase()
-      : "UNKNOWN";
+  if (
+    !elkosEnabled
+  ) {
 
-
-  /*
-   * ELKOS AUS
-   *
-   * normales Türschild
-   * keine Ausfallüberwachung
-   */
-
-  if (!elkosEnabled) {
-
-    lastElkosSuccess =
-      Date.now();
-
-    localFallbackActive =
-      false;
-
-    hideFallback();
+    currentBazStatus =
+      "DISABLED";
 
     hideStatusOverlay();
-
-    stopFastElkosPolling();
 
     return;
   }
 
 
-  /*
-   * ELKOS EIN
-   */
-
-  startFastElkosPolling();
-
-
-  /*
-   * Gültiger ELKOS-Status.
-   *
-   * NORMAL / CALL / BUSY / OFFLINE
-   * gelten als erfolgreiche Statusantwort.
-   */
-
   if (
-    data.bazStatusOk === true &&
-    currentBazStatus !== "UNKNOWN"
+    !data ||
+    data.bazStatusOk !== true
   ) {
 
-    lastElkosSuccess =
-      Date.now();
-
-    localFallbackActive =
-      false;
-
-    hideFallback();
-
-  } else {
-
     /*
-     * ELKOS liefert derzeit keine gültigen Daten.
-     * Erst nach 5 Minuten wird der Fallback gezeigt.
+     * Ein technischer Fehler verändert die sichtbare
+     * Anzeige NICHT. Der letzte gültige Zustand bleibt.
      */
-
-    checkFallback();
-
-    /*
-     * Solange die 5 Minuten noch nicht erreicht sind,
-     * bleibt das zuletzt angezeigte Türschild bestehen.
-     */
-
-    if (
-      Date.now() - lastElkosSuccess <
-      CONNECTION_FALLBACK_MS
-    ) {
-
-      return;
-    }
+    return;
   }
 
 
-  /*
-   * CALL
-   *
-   * BESCHAEFTIGT
-   */
+  var status =
+    String(
+      data.bazStatus ||
+      "UNKNOWN"
+    ).toUpperCase();
+
 
   if (
-    currentBazStatus === "CALL" &&
-    data.bazStatusOk === true
+    status === "UNKNOWN"
+  ) {
+
+    return;
+  }
+
+
+  currentBazStatus =
+    status;
+
+
+  /*
+   * Sicherheitsfallback:
+   * CALL/BUSY seit >= 30 Minuten unverändert.
+   */
+  if (
+    (
+      status === "CALL" ||
+      status === "BUSY"
+    ) &&
+    elkosStatusHaengt30Minuten(
+      data,
+      status
+    )
+  ) {
+
+    hideStatusOverlay();
+
+    return;
+  }
+
+
+  if (
+    status === "CALL"
   ) {
 
     showCallStatus();
@@ -839,15 +1032,8 @@ function applyBazStatus(data) {
   }
 
 
-  /*
-   * BUSY
-   *
-   * PAUSE und niemand verfügbar
-   */
-
   if (
-    currentBazStatus === "BUSY" &&
-    data.bazStatusOk === true
+    status === "BUSY"
   ) {
 
     showBusyStatus();
@@ -856,16 +1042,9 @@ function applyBazStatus(data) {
   }
 
 
-  /*
-   * NORMAL
-   * OFFLINE
-   *
-   * -> normales Disponentenbild
-   */
-
   if (
-    currentBazStatus === "NORMAL" ||
-    currentBazStatus === "OFFLINE"
+    status === "NORMAL" ||
+    status === "OFFLINE"
   ) {
 
     hideStatusOverlay();
@@ -873,35 +1052,21 @@ function applyBazStatus(data) {
 }
 
 
-
 /* =========================================================
-   META ÜBER JSONP HOLEN
+   HILFE: JSONP SCRIPT AUFRUF
    ========================================================= */
 
-function requestMeta(
-  callbackFunction
+function makeJsonpRequest(
+  url,
+  callbackPrefix,
+  timeoutMs,
+  onSuccess,
+  onTimeout
 ) {
 
-  /*
-   * Verhindert überlappende JSONP-Abfragen.
-   *
-   * Solange eine META-/ELKOS-Abfrage noch läuft,
-   * wird keine zweite parallel gestartet.
-   */
-  if (
-    metaRequestRunning
-  ) {
-
-    return;
-  }
-
-
-  metaRequestRunning =
-    true;
-
-
-  var cb =
-    "cb_" +
+  var callbackName =
+    callbackPrefix +
+    "_" +
     Date.now() +
     "_" +
     Math.floor(
@@ -915,243 +1080,107 @@ function requestMeta(
 
 
   var script =
-    null;
+    document.createElement(
+      "script"
+    );
 
 
-  window[cb] =
+  function cleanup() {
+
+    try {
+
+      delete window[
+        callbackName
+      ];
+
+    } catch (e) {}
+
+
+    if (
+      script &&
+      script.parentNode
+    ) {
+
+      script.parentNode
+        .removeChild(
+          script
+        );
+    }
+  }
+
+
+  window[
+    callbackName
+  ] =
     function(data) {
 
+      if (
+        responded
+      ) {
 
-      /*
-       * Request ist erfolgreich zurückgekommen.
-       * Sperre sofort wieder freigeben.
-       */
-      metaRequestRunning =
-        false;
+        return;
+      }
 
 
       responded =
         true;
 
 
-      /*
-       * Gültige Antwort
-       */
-
-      if (
-        data &&
-        data.ok &&
-        data.url
-      ) {
-
-
-        lastSuccess =
-          Date.now();
-
-
-        /*
-         * Letzten bekannten Disponenten merken.
-         */
-
-        if (
-          data.name
-        ) {
-
-          lastKnownDisponentName =
-            String(
-              data.name
-            );
-
-          try {
-            localStorage.setItem(
-              "bazLastKnownDisponentName",
-              lastKnownDisponentName
-            );
-          } catch (e) {}
-        }
-
-
-        /*
-         * Disponentenbild
-         */
-
-        if (
-          data.url !==
-          currentUrl
-        ) {
-
-
-          currentUrl =
-            data.url;
-
-
-          img.src =
-            currentUrl +
-
-            (
-              currentUrl.indexOf("?") >= 0
-                ? "&"
-                : "?"
-            ) +
-
-            "r=" +
-            Date.now();
-        }
-
-
-        /*
-         * ELKOS
-         */
-
-        applyBazStatus(
-          data
-        );
-
-
-        /*
-         * DEBUG
-         */
-
-        if (debugMode) {
-
-
-          var aps =
-            data.bazArbeitsplaetze ||
-            [];
-
-
-          var apText =
-            aps.map(
-              function(ap) {
-
-                return (
-
-                  (ap.arbeitsplatzName || "?") +
-
-                  " | " +
-
-                  (ap.disponentName || "-") +
-
-                  " | " +
-
-                  (ap.verfuegbarkeit || "?")
-                );
-              }
-            )
-            .join("<br>");
-
-
-          setDebug(
-
-            "<b>BAZ Türschild</b>" +
-
-            "<br><br>Disponent: " +
-            (
-              data.name ||
-              "-"
-            ) +
-
-            "<br>ELKOS aktiviert: " +
-            String(
-              data.bazStatusEnabled
-            ) +
-
-            "<br>BAZ Status: " +
-            (
-              data.bazStatus ||
-              "-"
-            ) +
-
-            "<br>BAZ Status OK: " +
-            String(
-              data.bazStatusOk
-            ) +
-
-            "<br>BAZ Meldung: " +
-            (
-              data.bazStatusMessage ||
-              "-"
-            ) +
-
-            "<br>UI Test: " +
-            (
-              uiTestMode ||
-              "aus"
-            ) +
-
-            "<br><br><b>Arbeitsplätze St. Pölten</b><br>" +
-
-            (
-              apText ||
-              "keine Daten"
-            )
-          );
-        }
-
-
-      } else {
-
-        checkFallback();
-      }
-
-
-      /*
-       * Callback entfernen
-       */
-
       try {
 
-        delete window[cb];
-
-      } catch (e) {}
-
-
-      /*
-       * Script entfernen
-       */
-
-      if (
-        script &&
-        script.parentNode
-      ) {
-
-        script.parentNode
-          .removeChild(
-            script
-          );
-      }
-
-
-      if (
-        typeof callbackFunction ===
-        "function"
-      ) {
-
-        callbackFunction(
+        onSuccess(
           data
         );
+
+      } finally {
+
+        cleanup();
       }
     };
 
 
-  /*
-   * JSONP Script
-   */
+  script.onerror =
+    function() {
 
-  script =
-    document.createElement(
-      "script"
-    );
+      if (
+        responded
+      ) {
+
+        return;
+      }
+
+
+      responded =
+        true;
+
+
+      cleanup();
+
+
+      if (
+        typeof onTimeout ===
+        "function"
+      ) {
+
+        onTimeout();
+      }
+    };
 
 
   script.src =
 
-    SCRIPT_URL +
+    url +
 
-    "?meta=1" +
+    (
+      url.indexOf("?") >= 0
+        ? "&"
+        : "?"
+    ) +
 
-    "&callback=" +
-    encodeURIComponent(cb) +
+    "callback=" +
+    encodeURIComponent(
+      callbackName
+    ) +
 
     "&t=" +
     Date.now();
@@ -1163,97 +1192,154 @@ function requestMeta(
     );
 
 
-  /*
-   * Timeout
-   */
-
   setTimeout(
     function() {
 
+      if (
+        responded
+      ) {
 
-      if (!responded) {
+        return;
+      }
 
-        /*
-         * Request hat innerhalb von 8 Sekunden
-         * nicht geantwortet.
-         *
-         * Sperre wieder freigeben, damit der
-         * nächste Poll normal starten kann.
-         */
-        metaRequestRunning =
-          false;
+
+      responded =
+        true;
+
+
+      cleanup();
+
+
+      if (
+        typeof onTimeout ===
+        "function"
+      ) {
+
+        onTimeout();
+      }
+
+    },
+    timeoutMs
+  );
+}
+
+
+/* =========================================================
+   BILD / DISPONENT
+   ========================================================= */
+
+function requestMeta() {
+
+  if (
+    metaRequestRunning ||
+    globalFallbackActive
+  ) {
+
+    return;
+  }
+
+
+  metaRequestRunning =
+    true;
+
+
+  makeJsonpRequest(
+
+    SCRIPT_URL +
+      "?schildmeta=1",
+
+    "schildmeta",
+
+    FAST_REQUEST_TIMEOUT,
+
+    function(data) {
+
+      metaRequestRunning =
+        false;
+
+
+      if (
+        !data ||
+        data.ok !== true ||
+        !data.url
+      ) {
 
         checkFallback();
+
+        return;
+      }
+
+
+      lastSuccess =
+        Date.now();
+
+
+      if (
+        data.name
+      ) {
+
+        lastKnownDisponentName =
+          String(
+            data.name
+          );
+
+
+        try {
+
+          localStorage.setItem(
+            "bazLastKnownDisponentName",
+            lastKnownDisponentName
+          );
+
+        } catch (e) {}
       }
 
 
       if (
-        script &&
-        script.parentNode
+        data.url !==
+        currentUrl
       ) {
 
-        script.parentNode
-          .removeChild(
-            script
-          );
+        currentUrl =
+          data.url;
+
+
+        img.src =
+          currentUrl +
+
+          (
+            currentUrl.indexOf("?") >= 0
+              ? "&"
+              : "?"
+          ) +
+
+          "r=" +
+          Date.now();
       }
 
 
-      try {
-
-        if (!responded) {
-
-          delete window[cb];
-        }
-
-      } catch (e) {}
-
-
+      checkFallback();
     },
-    8000
+
+    function() {
+
+      metaRequestRunning =
+        false;
+
+      checkFallback();
+    }
   );
 }
 
 
-
 /* =========================================================
-   NORMALES UPDATE
+   ELKOS SNAPSHOT LESEN
    ========================================================= */
 
-function update() {
-
-
-  if (
-    globalFallbackActive
-  ) {
-
-    showFallback();
-
-    return;
-  }
-
-
-  requestMeta();
-}
-
-
-
-/* =========================================================
-   SCHNELLES ELKOS UPDATE
-   ========================================================= */
-
-function elkosUpdate() {
-
+function requestElkosSnapshot() {
 
   if (
-    !elkosEnabled
-  ) {
-
-    return;
-  }
-
-
-  if (
+    snapshotRequestRunning ||
     globalFallbackActive
   ) {
 
@@ -1261,130 +1347,206 @@ function elkosUpdate() {
   }
 
 
-  requestMeta();
-}
+  snapshotRequestRunning =
+    true;
 
 
+  makeJsonpRequest(
 
-/* =========================================================
-   ELKOS TIMER START
-   ========================================================= */
+    SCRIPT_URL +
+      "?elkossnapshot=1",
 
-function startFastElkosPolling() {
+    "elkossnapshot",
 
+    FAST_REQUEST_TIMEOUT,
 
-  if (
-    elkosTimer !== null
-  ) {
+    function(data) {
 
-    return;
-  }
-
-
-  elkosTimer =
-    setInterval(
-
-      elkosUpdate,
-
-      ELKOS_UPDATE_INTERVAL
-    );
-}
+      snapshotRequestRunning =
+        false;
 
 
-
-/* =========================================================
-   ELKOS TIMER STOP
-   ========================================================= */
-
-function stopFastElkosPolling() {
-
-
-  if (
-    elkosTimer === null
-  ) {
-
-    return;
-  }
+      /*
+       * Der schnelle Snapshot-Endpunkt hat geantwortet:
+       * Backend ist erreichbar.
+       */
+      lastSuccess =
+        Date.now();
 
 
-  clearInterval(
-    elkosTimer
+      if (
+        !data ||
+        data.ok !== true
+      ) {
+
+        checkFallback();
+
+        return;
+      }
+
+
+      elkosEnabled =
+        data.bazStatusEnabled === true;
+
+
+      if (
+        !elkosEnabled
+      ) {
+
+        currentBazStatus =
+          "DISABLED";
+
+        lastElkosSuccess =
+          Date.now();
+
+        hideStatusOverlay();
+
+        checkFallback();
+
+        return;
+      }
+
+
+      var savedAt =
+        Number(
+          data.bazSnapshotSavedAt ||
+          0
+        );
+
+
+      /*
+       * WICHTIG:
+       * lastElkosSuccess wird aus dem echten Snapshot-Zeitpunkt
+       * übernommen – NICHT aus dem Zeitpunkt dieser Abfrage.
+       */
+      if (
+        savedAt > 0
+      ) {
+
+        lastElkosSuccess =
+          savedAt;
+      }
+
+
+      /*
+       * Nur gültige und noch nicht über 5 Minuten alte
+       * Snapshot-Daten sichtbar übernehmen.
+       */
+      if (
+        data.bazStatusOk === true &&
+        savedAt > 0 &&
+        Date.now() -
+          savedAt <
+          CONNECTION_FALLBACK_MS
+      ) {
+
+        if (
+          savedAt >
+            lastAppliedSnapshotTs ||
+          currentBazStatus !==
+            String(
+              data.bazStatus ||
+              "UNKNOWN"
+            ).toUpperCase()
+        ) {
+
+          lastAppliedSnapshotTs =
+            savedAt;
+
+
+          applyBazStatus(
+            data
+          );
+        }
+      }
+
+
+      checkFallback();
+    },
+
+    function() {
+
+      snapshotRequestRunning =
+        false;
+
+      checkFallback();
+    }
   );
-
-
-  elkosTimer =
-    null;
 }
 
 
-
 /* =========================================================
-   LOKALER FALLBACK
+   ELKOS LIVE REFRESH
    ========================================================= */
 
-function checkFallback() {
-
-
-  var now =
-    Date.now();
-
-
-  var backendDiff =
-    now -
-    lastSuccess;
-
-
-  var elkosDiff =
-    now -
-    lastElkosSuccess;
-
-
-  /*
-   * Backend selbst länger als 5 Minuten
-   * ohne gültige Antwort.
-   */
-
-  var backendLost =
-    backendDiff >=
-    CONNECTION_FALLBACK_MS;
-
-
-  /*
-   * ELKOS ist aktiviert, liefert aber
-   * länger als 5 Minuten keine gültigen Daten.
-   */
-
-  var elkosLost =
-    elkosEnabled &&
-    elkosDiff >=
-      CONNECTION_FALLBACK_MS;
-
+function requestElkosRefresh() {
 
   if (
-    backendLost ||
-    elkosLost
+    refreshRequestRunning ||
+    globalFallbackActive
   ) {
-
-    localFallbackActive =
-      true;
-
-    showFallback();
 
     return;
   }
 
 
-  /*
-   * Noch innerhalb der 5-Minuten-Toleranz:
-   * keine Verbindungsausfallanzeige.
-   */
+  refreshRequestRunning =
+    true;
 
-  localFallbackActive =
-    false;
 
-  hideFallback();
+  makeJsonpRequest(
+
+    SCRIPT_URL +
+      "?elkosrefresh=1",
+
+    "elkosrefresh",
+
+    ELKOS_REFRESH_TIMEOUT,
+
+    function(data) {
+
+      refreshRequestRunning =
+        false;
+
+
+      /*
+       * Egal ob ELKOS selbst erfolgreich war:
+       * Apps Script hat geantwortet -> Backend lebt.
+       */
+      lastSuccess =
+        Date.now();
+
+
+      /*
+       * Bei Live-Erfolg wurde der Snapshot serverseitig
+       * bereits aktualisiert. Sofort neu lesen.
+       */
+      if (
+        data &&
+        data.refreshOk === true
+      ) {
+
+        requestElkosSnapshot();
+      }
+
+
+      checkFallback();
+    },
+
+    function() {
+
+      /*
+       * Timeout / Netzwerkfehler:
+       * KEINE sichtbare Statusänderung.
+       * Der letzte gültige Snapshot bleibt stehen.
+       */
+      refreshRequestRunning =
+        false;
+
+      checkFallback();
+    }
+  );
 }
-
 
 
 /* =========================================================
@@ -1395,14 +1557,11 @@ img.onerror =
   function() {
 
     /*
-     * Ein einzelner Bildfehler löst nicht sofort
-     * den Verbindungsausfall aus.
-     * Die normale 5-Minuten-Überwachung entscheidet.
+     * Ein einzelner Bildfehler löst keinen sofortigen
+     * Fallback aus.
      */
-
     checkFallback();
   };
-
 
 
 /* =========================================================
@@ -1411,9 +1570,25 @@ img.onerror =
 
 async function checkGlobalFallbackStatus() {
 
+  if (
+    offlineTestMode
+  ) {
+
+    globalFallbackActive =
+      true;
+
+    checkFallback();
+
+    return;
+  }
+
+
   var url =
+
     GLOBAL_STATUS_URL +
+
     "?nocache=" +
+
     Date.now();
 
 
@@ -1429,7 +1604,9 @@ async function checkGlobalFallbackStatus() {
       );
 
 
-    if (!response.ok) {
+    if (
+      !response.ok
+    ) {
 
       throw new Error(
         "HTTP " +
@@ -1446,10 +1623,6 @@ async function checkGlobalFallbackStatus() {
       false;
 
 
-    /*
-     * Statusdatei sauber als JSON auswerten.
-     * Nur data.fallback === true zählt.
-     */
     try {
 
       var data =
@@ -1464,13 +1637,9 @@ async function checkGlobalFallbackStatus() {
           data.fallback === true
         );
 
+
     } catch (jsonErr) {
 
-      /*
-       * Falls die Datei wider Erwarten
-       * kein gültiges JSON ist, nur ein
-       * explizites fallback:true akzeptieren.
-       */
       fallbackIsTrue =
         /["']?fallback["']?\s*:\s*true/i
           .test(
@@ -1479,12 +1648,6 @@ async function checkGlobalFallbackStatus() {
     }
 
 
-    /*
-     * Erst nach ZWEI aufeinanderfolgenden TRUE-Antworten
-     * wird der globale Fallback wirklich eingeblendet.
-     * Damit kann ein einzelner Cache-/Netzwerk-Ausreißer
-     * nicht mehr kurz das schwarze Fallback-Bild zeigen.
-     */
     if (
       fallbackIsTrue
     ) {
@@ -1493,21 +1656,21 @@ async function checkGlobalFallbackStatus() {
 
 
       if (
-        globalFallbackTrueCount >= 2
+        globalFallbackTrueCount >=
+          2
       ) {
 
         globalFallbackActive =
           true;
-
-
-        showFallback();
       }
+
 
     } else {
 
-      /*
-       * Ein gültiges FALSE setzt sofort zurück.
-       */
+      var warAktiv =
+        globalFallbackActive;
+
+
       globalFallbackTrueCount =
         0;
 
@@ -1516,26 +1679,32 @@ async function checkGlobalFallbackStatus() {
         false;
 
 
-      hideFallback();
+      /*
+       * Nach Ende eines globalen Fallbacks
+       * sofort aktuelle Daten nachholen.
+       */
+      if (
+        warAktiv
+      ) {
+
+        requestMeta();
+
+        requestElkosSnapshot();
+
+        requestElkosRefresh();
+      }
     }
+
+
+    checkFallback();
 
 
   } catch (err) {
 
     /*
-     * Nur weil die globale Statusdatei
-     * kurz nicht erreichbar ist, wird
-     * KEIN Fallback eingeblendet.
+     * Fehler der globalen Statusdatei allein
+     * aktiviert KEINEN Fallback.
      */
-
-    if (debugMode) {
-
-      setDebug(
-        "Globaler Status konnte nicht geprüft werden:<br>" +
-        String(err)
-      );
-    }
-
 
     console.log(
       "Globaler Status konnte nicht geprüft werden:",
@@ -1545,35 +1714,6 @@ async function checkGlobalFallbackStatus() {
 }
 
 
-
-/* =========================================================
-   BESTEHENDER OFFLINE-TEST
-   ========================================================= */
-
-if (
-
-  params.has("offline")
-
-  ||
-
-  params.has("testoffline")
-
-  ||
-
-  params.get("test") === "offline"
-
-) {
-
-
-  globalFallbackActive =
-    true;
-
-
-  showFallback();
-}
-
-
-
 /* =========================================================
    START
    ========================================================= */
@@ -1581,478 +1721,96 @@ if (
 hideStatusOverlay();
 
 
-/*
- * Falls UI Test aktiv:
- * sofort anzeigen.
- */
+if (
+  offlineTestMode
+) {
+
+  showFallback(
+    "GLOBAL"
+  );
+}
+
 
 applyUiTestMode();
 
 
 /*
- * normales Türschild laden
+ * Bild/Name sofort laden.
  */
-
-update();
+requestMeta();
 
 
 /*
- * globalen Status prüfen
+ * Zuerst vorhandenen Snapshot sofort anzeigen.
  */
+requestElkosSnapshot();
 
+
+/*
+ * Danach echten Live-Refresh im Hintergrund anstoßen.
+ */
+requestElkosRefresh();
+
+
+/*
+ * Globalen Status prüfen.
+ */
 checkGlobalFallbackStatus();
-
 
 
 /* =========================================================
    TIMER
    ========================================================= */
 
-
 /*
- * normales Türschild
- *
- * 30 Sekunden wie bisher
+ * Bild / Disponent
  */
-
 setInterval(
-
-  update,
-
-  NORMAL_UPDATE_INTERVAL
+  requestMeta,
+  META_UPDATE_INTERVAL
 );
 
 
 /*
- * globaler Fallback
- *
- * 10 Sekunden wie bisher
+ * Snapshot lesen.
+ * Das ist KEIN ELKOS-Liveabruf.
  */
-
 setInterval(
+  requestElkosSnapshot,
+  ELKOS_SNAPSHOT_INTERVAL
+);
 
+
+/*
+ * ELKOS live im Hintergrund aktualisieren.
+ */
+setInterval(
+  requestElkosRefresh,
+  ELKOS_REFRESH_INTERVAL
+);
+
+
+/*
+ * Lokalen Fallback regelmäßig prüfen.
+ */
+setInterval(
+  checkFallback,
+  1000
+);
+
+
+/*
+ * Globaler Fallback.
+ */
+setInterval(
   checkGlobalFallbackStatus,
-
   10000
 );
-/* =========================================================
-   ELKOS 30-MINUTEN-SICHERHEITSFALLBACK
-   CALL/BUSY -> nach 30 Minuten normales Disponentenbild
-   ========================================================= */
 
-(function() {
+console.log(
+  "✅ BAZ Türschild Snapshot-Modus geladen."
+);
 
-  var ELKOS_STUCK_30_MIN =
-    30 * 60 * 1000;
-
-
-  /*
-   * Bestehende Funktion sichern
-   */
-  var originalApplyBazStatus30 =
-    applyBazStatus;
-
-
-  /*
-   * Prüft, ob BESCHAEFTIGT bzw. PAUSE
-   * seit mindestens 30 Minuten unverändert ist.
-   */
-  function elkosStatusHaengt30Minuten(
-    data,
-    status
-  ) {
-
-    if (
-      !data ||
-      !Array.isArray(
-        data.bazArbeitsplaetze
-      )
-    ) {
-
-      return false;
-    }
-
-
-    var elkosRawStatus = "";
-
-    if (
-      status === "CALL"
-    ) {
-
-      elkosRawStatus =
-        "BESCHAEFTIGT";
-
-    } else if (
-      status === "BUSY"
-    ) {
-
-      elkosRawStatus =
-        "PAUSE";
-
-    } else {
-
-      return false;
-    }
-
-
-    var zeiten =
-      data.bazArbeitsplaetze
-
-        .filter(
-          function(ap) {
-
-            return String(
-              ap.verfuegbarkeit ||
-              ""
-            ).toUpperCase() ===
-              elkosRawStatus;
-          }
-        )
-
-        .map(
-          function(ap) {
-
-            return Date.parse(
-              ap.letzteAenderung ||
-              ""
-            );
-          }
-        )
-
-        .filter(
-          function(ts) {
-
-            return Number.isFinite(
-              ts
-            );
-          }
-        );
-
-
-    /*
-     * Kein verwertbarer Zeitstempel:
-     * nichts verändern.
-     */
-    if (
-      zeiten.length === 0
-    ) {
-
-      return false;
-    }
-
-
-    /*
-     * Bei mehreren betroffenen Arbeitsplätzen
-     * zählt die jüngste Statusänderung.
-     */
-    var letzteAenderung =
-      Math.max.apply(
-        null,
-        zeiten
-      );
-
-
-    return (
-      Date.now() -
-      letzteAenderung
-    ) >=
-      ELKOS_STUCK_30_MIN;
-  }
-
-
-  /*
-   * Bestehende ELKOS-Auswertung erweitern
-   */
-  applyBazStatus =
-    function(data) {
-
-      /*
-       * Zuerst alles wie bisher ausführen.
-       *
-       * Dadurch bleiben:
-       * - ELKOS EIN/AUS
-       * - 5-Sekunden-Polling
-       * - CALL
-       * - BUSY
-       * - normale Anzeige
-       * vollständig erhalten.
-       */
-      originalApplyBazStatus30(
-        data
-      );
-
-
-      if (
-        !data ||
-        data.bazStatusOk !== true
-      ) {
-
-        return;
-      }
-
-
-      var status =
-        String(
-          data.bazStatus ||
-          ""
-        ).toUpperCase();
-
-
-      /*
-       * Nur CALL und BUSY überwachen.
-       */
-      if (
-        status !== "CALL" &&
-        status !== "BUSY"
-      ) {
-
-        return;
-      }
-
-
-      /*
-       * Seit 30 Minuten unverändert?
-       */
-      if (
-        !elkosStatusHaengt30Minuten(
-          data,
-          status
-        )
-      ) {
-
-        return;
-      }
-
-
-      /*
-       * Sicherheitsfallback:
-       * Statusanzeige weg ->
-       * normales Disponentenbild bleibt sichtbar.
-       */
-      hideStatusOverlay();
-
-
-      console.log(
-        "⚠️ ELKOS " +
-        status +
-        " seit mindestens 30 Minuten unverändert – " +
-        "Türschild zeigt wieder den normalen Disponenten."
-      );
-    };
-
-
-  console.log(
-    "✅ ELKOS 30-Minuten-Sicherheitsfallback geladen."
-  );
-
-})();
-
-  /* =========================================================
-   TÜRSCHILD FALLBACK-DIAGNOSE
-   Unterscheidet:
-   - Apps Script / Backend
-   - ELKOS Status
-   - globaler Fallback
-   ========================================================= */
-
-(function() {
-
-  var originalShowFallbackDiagnosis =
-    showFallback;
-
-  var lastFallbackReason =
-    "";
-
-
-  function getFallbackReason() {
-
-    var now =
-      Date.now();
-
-
-    /*
-     * 1. Globaler Fallback
-     */
-    if (
-      globalFallbackActive === true
-    ) {
-
-      return "GLOBAL";
-    }
-
-
-    /*
-     * 2. Apps Script / Backend
-     */
-    var backendDiff =
-      now -
-      lastSuccess;
-
-    if (
-      backendDiff >=
-      CONNECTION_FALLBACK_MS
-    ) {
-
-      return "BACKEND";
-    }
-
-
-    /*
-     * 3. ELKOS Status
-     */
-    var elkosDiff =
-      now -
-      lastElkosSuccess;
-
-    if (
-      elkosEnabled === true &&
-      elkosDiff >=
-        CONNECTION_FALLBACK_MS
-    ) {
-
-      return "ELKOS";
-    }
-
-
-    return "UNBEKANNT";
-  }
-
-
-  showFallback =
-    function() {
-
-      /*
-       * Bestehende Anzeige zuerst ausführen.
-       */
-      originalShowFallbackDiagnosis();
-
-
-      var grund =
-        getFallbackReason();
-
-
-      var meldungText =
-        document.getElementById(
-          "meldungText"
-        );
-
-
-      var nameText =
-        lastKnownDisponentName
-          ? lastKnownDisponentName
-          : "derzeit nicht verfügbar";
-
-
-      /*
-       * Apps Script / Backend
-       */
-      if (
-        grund === "BACKEND"
-      ) {
-
-        meldungText.innerHTML =
-          "Derzeit gibt es Verbindungsschwierigkeiten.<br>" +
-          "Die Verbindung zum Türschild-Server ist derzeit unterbrochen.<br><br>" +
-          "<strong>Diensthabender Disponent:</strong><br>" +
-          "<span style='font-size:1.4em;font-weight:700;'>" +
-          nameText +
-          "</span><br><br>" +
-          "Bitte läuten Sie einfach an.";
-      }
-
-
-      /*
-       * ELKOS selbst
-       */
-      else if (
-        grund === "ELKOS"
-      ) {
-
-        meldungText.innerHTML =
-          "Derzeit gibt es Verbindungsschwierigkeiten.<br>" +
-          "Der ELKOS-Status kann momentan nicht aktualisiert werden.<br><br>" +
-          "<strong>Diensthabender Disponent:</strong><br>" +
-          "<span style='font-size:1.4em;font-weight:700;'>" +
-          nameText +
-          "</span><br><br>" +
-          "Bitte läuten Sie einfach an.";
-      }
-
-
-      /*
-       * Globaler Fallback
-       */
-      else if (
-        grund === "GLOBAL"
-      ) {
-
-        meldungText.innerHTML =
-          "Das digitale Türschild befindet sich derzeit im Fallback-Modus.<br><br>" +
-          "<strong>Diensthabender Disponent:</strong><br>" +
-          "<span style='font-size:1.4em;font-weight:700;'>" +
-          nameText +
-          "</span><br><br>" +
-          "Bitte läuten Sie einfach an.";
-      }
-
-
-      /*
-       * Diagnose nur einmal bei Änderung loggen.
-       */
-      if (
-        grund !==
-        lastFallbackReason
-      ) {
-
-        lastFallbackReason =
-          grund;
-
-
-        console.log(
-          "⚠️ TÜRSCHILD FALLBACK:",
-          grund
-        );
-
-
-        console.log(
-          "Backend letzte Antwort vor:",
-          Math.round(
-            (
-              Date.now() -
-              lastSuccess
-            ) /
-            1000
-          ),
-          "Sekunden"
-        );
-
-
-        console.log(
-          "ELKOS letzte gültige Antwort vor:",
-          Math.round(
-            (
-              Date.now() -
-              lastElkosSuccess
-            ) /
-            1000
-          ),
-          "Sekunden"
-        );
-
-
-        console.log(
-          "Globaler Fallback:",
-          globalFallbackActive
-        );
-      }
-    };
-
-
-  console.log(
-    "✅ Türschild-Fallback-Diagnose geladen."
-  );
-
-})();
 </script>
 
 </body>
