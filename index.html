@@ -350,10 +350,22 @@ var FAST_REQUEST_TIMEOUT =
 
 
 /*
- * Erst nach 5 Minuten ohne gültige Daten
- * wird der lokale Fallback angezeigt.
+ * Nur wenn das Apps-Script-Backend 5 Minuten lang
+ * gar nicht antwortet, wird der lokale Fallback angezeigt.
+ *
+ * WICHTIG:
+ * Ein reiner ELKOS-Ausfall löst KEINEN großen Fallback aus.
  */
-var CONNECTION_FALLBACK_MS =
+var BACKEND_FALLBACK_MS =
+  5 * 60 * 1000;
+
+
+/*
+ * ELKOS-Daten dürfen maximal 5 Minuten alt sein.
+ * Danach wird nur die ELKOS-Statusanzeige verworfen und
+ * wieder das normale Disponentenbild gezeigt.
+ */
+var ELKOS_DATA_MAX_AGE_MS =
   5 * 60 * 1000;
 
 
@@ -446,6 +458,13 @@ var elkosEnabled =
 
 var currentBazStatus =
   "UNKNOWN";
+
+/*
+ * Letzte technische ELKOS-Diagnose.
+ * Wird nur im ?debug=1 Panel angezeigt.
+ */
+var lastElkosDiagnostic =
+  "";
 
 var metaRequestRunning =
   false;
@@ -635,6 +654,9 @@ function applyUiTestMode() {
 
 function getFallbackReason() {
 
+  /*
+   * Globaler Fallback bleibt bewusst erhalten.
+   */
   if (
     globalFallbackActive === true
   ) {
@@ -647,24 +669,19 @@ function getFallbackReason() {
     Date.now();
 
 
+  /*
+   * Nur ein echter Backend-Ausfall darf den großen
+   * Verbindungs-Fallback einschalten.
+   *
+   * ELKOS ist davon absichtlich entkoppelt.
+   */
   if (
     now -
     lastSuccess >=
-      CONNECTION_FALLBACK_MS
+      BACKEND_FALLBACK_MS
   ) {
 
     return "BACKEND";
-  }
-
-
-  if (
-    elkosEnabled === true &&
-    now -
-    lastElkosSuccess >=
-      CONNECTION_FALLBACK_MS
-  ) {
-
-    return "ELKOS";
   }
 
 
@@ -715,9 +732,12 @@ function showFallback(
 
   } else {
 
+    /*
+     * Sicherheitsnetz für unbekannte zukünftige Gründe.
+     * ELKOS selbst kommt hier NICHT mehr hinein.
+     */
     meldungText.innerHTML =
-      "Derzeit gibt es Verbindungsschwierigkeiten.<br>" +
-      "Der ELKOS-Status kann momentan nicht aktualisiert werden.<br><br>" +
+      "Derzeit gibt es Verbindungsschwierigkeiten.<br><br>" +
       "<strong>Diensthabender Disponent:</strong><br>" +
       "<span style='font-size:1.4em;font-weight:700;'>" +
       nameText +
@@ -755,8 +775,7 @@ function checkFallback() {
 
   localFallbackActive =
     (
-      reason === "BACKEND" ||
-      reason === "ELKOS"
+      reason === "BACKEND"
     );
 
 
@@ -816,6 +835,25 @@ function checkFallback() {
         1000
       ) +
       " s" +
+
+      "<br>ELKOS Daten: " +
+      (
+        !elkosEnabled
+          ? "DEAKTIVIERT"
+          : (
+              Date.now() -
+              lastElkosSuccess <
+                ELKOS_DATA_MAX_AGE_MS
+                ? "AKTUELL"
+                : "VERALTET – normales Bild bleibt aktiv"
+            )
+      ) +
+
+      "<br>ELKOS Diagnose: " +
+      (
+        lastElkosDiagnostic ||
+        "OK"
+      ) +
 
       "<br>Fallback: " +
       (
@@ -1470,7 +1508,8 @@ function requestElkosSnapshot() {
 
       /*
        * Der schnelle Snapshot-Endpunkt hat geantwortet:
-       * Backend ist erreichbar.
+       * Backend ist erreichbar – unabhängig davon,
+       * ob ELKOS selbst gerade funktioniert.
        */
       lastSuccess =
         Date.now();
@@ -1492,6 +1531,18 @@ function requestElkosSnapshot() {
 
 
       if (
+        data.bazDiagnostic &&
+        data.bazDiagnostic.message
+      ) {
+
+        lastElkosDiagnostic =
+          String(
+            data.bazDiagnostic.message
+          );
+      }
+
+
+      if (
         !elkosEnabled
       ) {
 
@@ -1500,6 +1551,9 @@ function requestElkosSnapshot() {
 
         lastElkosSuccess =
           Date.now();
+
+        lastElkosDiagnostic =
+          "";
 
         hideStatusOverlay();
 
@@ -1517,9 +1571,8 @@ function requestElkosSnapshot() {
 
 
       /*
-       * WICHTIG:
-       * lastElkosSuccess wird aus dem echten Snapshot-Zeitpunkt
-       * übernommen – NICHT aus dem Zeitpunkt dieser Abfrage.
+       * Zeitpunkt des letzten ECHTEN erfolgreichen
+       * ELKOS-Liveabrufs übernehmen.
        */
       if (
         savedAt > 0
@@ -1530,17 +1583,34 @@ function requestElkosSnapshot() {
       }
 
 
-      /*
-       * Nur gültige und noch nicht über 5 Minuten alte
-       * Snapshot-Daten sichtbar übernehmen.
-       */
+      var snapshotFresh =
+        (
+          data.bazStatusOk === true &&
+          savedAt > 0 &&
+          Date.now() -
+            savedAt <
+            ELKOS_DATA_MAX_AGE_MS
+        );
+
+
       if (
-        data.bazStatusOk === true &&
-        savedAt > 0 &&
-        Date.now() -
-          savedAt <
-          CONNECTION_FALLBACK_MS
+        snapshotFresh
       ) {
+
+        /*
+         * Ein frischer Snapshot ist wieder da.
+         * Eine alte technische Fehlermeldung darf verschwinden,
+         * sofern das Backend keine neue Diagnose mitsendet.
+         */
+        if (
+          !data.bazDiagnostic ||
+          !data.bazDiagnostic.message
+        ) {
+
+          lastElkosDiagnostic =
+            "";
+        }
+
 
         if (
           savedAt >
@@ -1560,6 +1630,49 @@ function requestElkosSnapshot() {
             data
           );
         }
+
+      } else {
+
+        /*
+         * WICHTIG:
+         * ELKOS ist nicht aktuell -> KEIN großer Fallback.
+         * Eine eventuell alte CALL/BUSY-Anzeige wird entfernt,
+         * damit immer das normale Disponentenbild sichtbar bleibt.
+         */
+        currentBazStatus =
+          "UNKNOWN";
+
+        hideStatusOverlay();
+
+
+        if (
+          !lastElkosDiagnostic
+        ) {
+
+          if (
+            savedAt > 0
+          ) {
+
+            lastElkosDiagnostic =
+              "ELKOS Snapshot seit " +
+              Math.round(
+                (
+                  Date.now() -
+                  savedAt
+                ) /
+                1000
+              ) +
+              " s nicht aktualisiert";
+
+          } else {
+
+            lastElkosDiagnostic =
+              String(
+                data.bazStatusMessage ||
+                "Noch kein gültiger ELKOS Snapshot vorhanden"
+              );
+          }
+        }
       }
 
 
@@ -1571,11 +1684,15 @@ function requestElkosSnapshot() {
       snapshotRequestRunning =
         false;
 
+      /*
+       * Ein einzelner Snapshot-Timeout löst keinen Fallback aus.
+       * Erst wenn das Backend insgesamt BACKEND_FALLBACK_MS
+       * nicht mehr antwortet, greift BACKEND.
+       */
       checkFallback();
     }
   );
 }
-
 
 /* =========================================================
    ELKOS LIVE REFRESH
@@ -1612,23 +1729,48 @@ function requestElkosRefresh() {
 
 
       /*
-       * Egal ob ELKOS selbst erfolgreich war:
        * Apps Script hat geantwortet -> Backend lebt.
+       * Das gilt auch dann, wenn ELKOS selbst gerade fehlschlägt.
        */
       lastSuccess =
         Date.now();
 
 
-      /*
-       * Bei Live-Erfolg wurde der Snapshot serverseitig
-       * bereits aktualisiert. Sofort neu lesen.
-       */
       if (
         data &&
         data.refreshOk === true
       ) {
 
+        lastElkosDiagnostic =
+          "";
+
+        /*
+         * Erfolgreicher Liveabruf -> neuen Snapshot sofort lesen.
+         */
         requestElkosSnapshot();
+
+      } else if (
+        data
+      ) {
+
+        if (
+          data.bazDiagnostic &&
+          data.bazDiagnostic.message
+        ) {
+
+          lastElkosDiagnostic =
+            String(
+              data.bazDiagnostic.message
+            );
+
+        } else {
+
+          lastElkosDiagnostic =
+            String(
+              data.bazStatusMessage ||
+              "ELKOS Live-Refresh nicht erfolgreich"
+            );
+        }
       }
 
 
@@ -1637,19 +1779,20 @@ function requestElkosRefresh() {
 
     function() {
 
-      /*
-       * Timeout / Netzwerkfehler:
-       * KEINE sichtbare Statusänderung.
-       * Der letzte gültige Snapshot bleibt stehen.
-       */
       refreshRequestRunning =
         false;
 
+      lastElkosDiagnostic =
+        "ELKOS Live-Refresh: Timeout oder Netzwerkfehler";
+
+      /*
+       * KEIN großer Fallback wegen ELKOS.
+       * Das normale Türschild bleibt bestehen.
+       */
       checkFallback();
     }
   );
 }
-
 
 /* =========================================================
    BILDFEHLER
