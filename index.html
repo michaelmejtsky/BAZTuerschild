@@ -361,12 +361,15 @@ var BACKEND_FALLBACK_MS =
 
 
 /*
- * ELKOS-Daten dürfen maximal 5 Minuten alt sein.
- * Danach wird nur die ELKOS-Statusanzeige verworfen und
- * wieder das normale Disponentenbild gezeigt.
+ * ELKOS-Daten dürfen maximal 30 Sekunden alt sein.
+ * Danach wird CALL/BUSY/NORMAL als nicht mehr sicher aktuell
+ * verworfen und das normale Disponentenbild gezeigt.
+ *
+ * WICHTIG:
+ * Das löst KEINEN großen Verbindungs-Fallback aus.
  */
 var ELKOS_DATA_MAX_AGE_MS =
-  5 * 60 * 1000;
+  30 * 1000;
 
 
 /*
@@ -412,8 +415,11 @@ var currentUrl =
  * Letzter erfolgreicher Kontakt zum Apps-Script-Backend.
  * JEDER schnelle Snapshot-/Meta-Erfolg zählt.
  */
-var lastSuccess =
+var pageStartedAt =
   Date.now();
+
+var lastSuccess =
+  0;
 
 
 /*
@@ -421,7 +427,7 @@ var lastSuccess =
  * Wird NICHT bei jedem Lesen des gleichen Snapshots erneuert.
  */
 var lastElkosSuccess =
-  Date.now();
+  0;
 
 
 var lastAppliedSnapshotTs =
@@ -675,9 +681,15 @@ function getFallbackReason() {
    *
    * ELKOS ist davon absichtlich entkoppelt.
    */
+  var backendReferenceTs =
+    lastSuccess > 0
+      ? lastSuccess
+      : pageStartedAt;
+
+
   if (
     now -
-    lastSuccess >=
+    backendReferenceTs >=
       BACKEND_FALLBACK_MS
   ) {
 
@@ -767,7 +779,50 @@ function hideFallback() {
 }
 
 
+function enforceElkosFreshness() {
+
+  if (
+    elkosEnabled !== true
+  ) {
+
+    return;
+  }
+
+
+  var fresh =
+    (
+      lastElkosSuccess > 0 &&
+      Date.now() -
+        lastElkosSuccess <
+        ELKOS_DATA_MAX_AGE_MS
+    );
+
+
+  if (
+    !fresh
+  ) {
+
+    /*
+     * Kein bestätigter ELKOS-Live-Status innerhalb von 30 s:
+     * alten CALL/BUSY/NORMAL nicht weiter als aktuell ausgeben.
+     */
+    currentBazStatus =
+      "UNKNOWN";
+
+    hideStatusOverlay();
+  }
+}
+
+
 function checkFallback() {
+
+  /*
+   * ELKOS-Frische unabhängig vom großen Fallback überwachen.
+   * Dadurch kann ein alter CALL/BUSY auch dann nicht hängen bleiben,
+   * wenn gerade Snapshot-Requests ausfallen.
+   */
+  enforceElkosFreshness();
+
 
   var reason =
     getFallbackReason();
@@ -817,35 +872,51 @@ function checkFallback() {
       ) +
 
       "<br>Backend letzte Antwort vor: " +
-      Math.round(
-        (
-          Date.now() -
-          lastSuccess
-        ) /
-        1000
+      (
+        lastSuccess > 0
+          ? (
+              Math.round(
+                (
+                  Date.now() -
+                  lastSuccess
+                ) /
+                1000
+              ) +
+              " s"
+            )
+          : "NOCH KEINE ANTWORT"
       ) +
-      " s" +
 
-      "<br>ELKOS letzter Live-Snapshot vor: " +
-      Math.round(
-        (
-          Date.now() -
-          lastElkosSuccess
-        ) /
-        1000
+      "<br>ELKOS letzter bestätigter Live-Status vor: " +
+      (
+        lastElkosSuccess > 0
+          ? (
+              Math.round(
+                (
+                  Date.now() -
+                  lastElkosSuccess
+                ) /
+                1000
+              ) +
+              " s"
+            )
+          : "NOCH KEINER"
       ) +
-      " s" +
 
       "<br>ELKOS Daten: " +
       (
         !elkosEnabled
           ? "DEAKTIVIERT"
           : (
-              Date.now() -
-              lastElkosSuccess <
-                ELKOS_DATA_MAX_AGE_MS
-                ? "AKTUELL"
-                : "VERALTET – normales Bild bleibt aktiv"
+              lastElkosSuccess <= 0
+                ? "NOCH KEIN GÜLTIGER LIVE-STATUS"
+                : (
+                    Date.now() -
+                    lastElkosSuccess <
+                      ELKOS_DATA_MAX_AGE_MS
+                      ? "AKTUELL (max. 30 s)"
+                      : "VERALTET (>30 s) – normales Bild bleibt aktiv"
+                  )
             )
       ) +
 
@@ -1550,7 +1621,7 @@ function requestElkosSnapshot() {
           "DISABLED";
 
         lastElkosSuccess =
-          Date.now();
+          0;
 
         lastElkosDiagnostic =
           "";
@@ -1744,8 +1815,35 @@ function requestElkosRefresh() {
         lastElkosDiagnostic =
           "";
 
+
         /*
-         * Erfolgreicher Liveabruf -> neuen Snapshot sofort lesen.
+         * DAS ist ein bestätigter erfolgreicher ELKOS-Liveabruf.
+         * Den Status sofort übernehmen – nicht erst auf den nächsten
+         * Snapshot-Request warten.
+         */
+        var liveTs =
+          Number(
+            data.bazUpdatedTs ||
+            Date.now()
+          );
+
+        lastElkosSuccess =
+          liveTs;
+
+        lastAppliedSnapshotTs =
+          Math.max(
+            lastAppliedSnapshotTs,
+            liveTs
+          );
+
+        applyBazStatus(
+          data
+        );
+
+
+        /*
+         * Danach Snapshot lesen, damit auch die vollständigen
+         * Arbeitsplatzdaten/Zeiten synchron bleiben.
          */
         requestElkosSnapshot();
 
