@@ -312,34 +312,37 @@ var GLOBAL_STATUS_URL =
 
 /*
  * Disponentenbild / Name:
- * alle 30 Sekunden.
+ * alle 15 Sekunden. Der Disponent wechselt selten,
+ * aber ein Schichtwechsel soll trotzdem rasch sichtbar sein.
  */
 var META_UPDATE_INTERVAL =
-  30000;
+  15000;
 
 
 /*
  * Snapshot lesen:
- * sehr billig, weil KEIN Live-ELKOS-Aufruf.
+ * nur als Sicherheits-/Synchronisationsabfrage alle 30 Sekunden.
+ * Der sichtbare Status kommt primär direkt vom Live-Refresh.
  */
 var ELKOS_SNAPSHOT_INTERVAL =
-  1000;
+  30000;
 
 
 /*
  * Echten ELKOS-Liveabruf anstoßen:
- * alle 5 Sekunden.
+ * alle 3 Sekunden. CALL/BUSY/NORMAL werden direkt aus
+ * dieser Antwort übernommen – ohne auf den Snapshot zu warten.
  */
 var ELKOS_REFRESH_INTERVAL =
-  5000;
+  3000;
 
 
 /*
  * Ein hängender Live-Refresh darf die Anzeige nicht blockieren.
- * Nach 12 Sekunden darf ein neuer Refresh versucht werden.
+ * Nach 8 Sekunden darf ein neuer Refresh versucht werden.
  */
 var ELKOS_REFRESH_TIMEOUT =
-  12000;
+  8000;
 
 
 /*
@@ -447,6 +450,44 @@ try {
 } catch (e) {}
 
 
+/*
+ * Letztes erfolgreiches Disponentenbild lokal merken.
+ * Dadurch bleibt das wichtigste Element – Name/Bild des
+ * diensthabenden Disponenten – auch bei einem kurzen
+ * Apps-Script-Aussetzer sofort sichtbar.
+ */
+var lastKnownImageUrl =
+  "";
+
+try {
+
+  lastKnownImageUrl =
+    localStorage.getItem(
+      "bazLastKnownImageUrl"
+    ) || "";
+
+} catch (e) {}
+
+
+if (
+  lastKnownImageUrl
+) {
+
+  currentUrl =
+    lastKnownImageUrl;
+
+  img.src =
+    currentUrl +
+    (
+      currentUrl.indexOf("?") >= 0
+        ? "&"
+        : "?"
+    ) +
+    "startup=" +
+    Date.now();
+}
+
+
 var globalFallbackActive =
   false;
 
@@ -471,6 +512,15 @@ var currentBazStatus =
  */
 var lastElkosDiagnostic =
   "";
+
+var lastRefreshDurationMs =
+  0;
+
+var lastAuthDurationMs =
+  0;
+
+var lastElkosApiDurationMs =
+  0;
 
 var metaRequestRunning =
   false;
@@ -924,6 +974,27 @@ function checkFallback() {
       (
         lastElkosDiagnostic ||
         "OK"
+      ) +
+
+      "<br>Letzter Live-Refresh gesamt: " +
+      (
+        lastRefreshDurationMs > 0
+          ? lastRefreshDurationMs + " ms"
+          : "-"
+      ) +
+
+      "<br>Authentifizierung/Token: " +
+      (
+        lastAuthDurationMs > 0
+          ? lastAuthDurationMs + " ms"
+          : "-"
+      ) +
+
+      "<br>ELKOS API: " +
+      (
+        lastElkosApiDurationMs > 0
+          ? lastElkosApiDurationMs + " ms"
+          : "-"
       ) +
 
       "<br>Fallback: " +
@@ -1442,6 +1513,24 @@ function requestMeta() {
 
 
         /*
+         * Letztes gültiges Bild lokal sichern.
+         * Das Dashboard/Apps Script bleibt die Datenquelle;
+         * localStorage ist nur die Anzeige-Ausfallsicherung.
+         */
+        try {
+
+          localStorage.setItem(
+            "bazLastKnownImageUrl",
+            neueUrl
+          );
+
+          lastKnownImageUrl =
+            neueUrl;
+
+        } catch (e) {}
+
+
+        /*
          * Bild beim ersten erfolgreichen META-Aufruf
          * IMMER setzen. Danach nur bei Änderung oder wenn
          * das img-Element noch keine Quelle hat.
@@ -1805,6 +1894,31 @@ function requestElkosRefresh() {
        */
       lastSuccess =
         Date.now();
+
+
+      if (data) {
+
+        lastRefreshDurationMs =
+          Number(
+            data.durationMs ||
+            0
+          );
+
+        if (data.bazTiming) {
+
+          lastAuthDurationMs =
+            Number(
+              data.bazTiming.authMs ||
+              0
+            );
+
+          lastElkosApiDurationMs =
+            Number(
+              data.bazTiming.elkosMs ||
+              0
+            );
+        }
+      }
 
 
       if (
